@@ -1,0 +1,16 @@
+[project]
+name = "db_schema"
+version = "0.1.0"
+description = "SQLModel schema, engine, and Alembic migrations for the cahiers Postgres database."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlmodel>=0.0.22",
+    "alembic>=1.14",
+    "psycopg[binary]>=3.2",
+]
+
+# This part is used in-place (scripts + `alembic` with prepend_sys_path); it is
+# not built/installed as a wheel, so mark it as a virtual workspace member.
+[tool.uv]
+package = false
