@@ -1,0 +1,7 @@
+backend: azure
+model: gpt-5.1
+pool_size: 50
+api_key_env_var: ""
+endpoint_args:
+  azure_endpoint: ""
+  api_version: ""

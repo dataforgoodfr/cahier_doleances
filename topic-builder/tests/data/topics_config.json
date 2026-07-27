@@ -1,0 +1,19 @@
+{
+  "topics": [
+    {
+      "name": "Water Cycle",
+      "description": "The continuous movement of water through evaporation, condensation, and precipitation.",
+      "parent": null
+    },
+    {
+      "name": "Hydrological Cycle",
+      "description": "The circulation of water within Earth's hydrosphere.",
+      "parent": null
+    },
+    {
+      "name": "Photosynthesis",
+      "description": "The process by which plants convert sunlight and CO2 into glucose and oxygen.",
+      "parent": null
+    }
+  ]
+}
