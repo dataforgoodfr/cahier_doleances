@@ -166,3 +166,5 @@ cython_debug/
 data/
 .DS_Store
 backups/
+analysis_v3.zip
+analysis_v3/
