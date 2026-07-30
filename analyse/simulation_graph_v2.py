@@ -3,11 +3,17 @@
 Données : livraison v3 (analysis_v3), hiérarchie à 8 niveaux (level 0→7).
 - parent est un UUID (v3) → résolu vers le nom (les noms sont uniques) ;
 - filtre de vue : on écarte isolés + cycles (quasi nuls en v3) ;
-- vue d'ensemble = squelette des sommets d'arbres, layout RADIAL de forêt
-  (un secteur angulaire par arbre, profondeur = rayon) : pas de chevauchement ;
-- navigation = CASCADE DYNAMIQUE de sélecteurs : un dropdown par niveau du chemin,
+- les 20 arbres sont rangés en PALIERS par hauteur (A : 6-7 · B : 3-4 · C : 1-2),
+  car ils n'ont rien de comparable : 2 arbres portent 95 % du signal, 13 en portent 1 % ;
+- un palier = une vue : on entre par une racine (le cluster le plus généraliste)
+  et on descend vers les feuilles. Layout RADIAL de forêt, secteur alloué par
+  PALIER sinon les 2 géants écrasent tout ;
+- navigation = CASCADE DYNAMIQUE de sélecteurs : un dropdown par cran du chemin,
   ils apparaissent à mesure qu'on descend (les codes du 4-niveaux, scalés à 8) ;
-- couleur = niveau dans l'arbre (un ton distinct par niveau), taille = détections agrégées.
+- couleur = PROFONDEUR depuis la racine de son arbre, PAS le `level` de JB : ses
+  20 racines sont aux levels {1,2,3,4,6,7}, donc deux points d'entrée équivalents
+  recevaient deux couleurs. Toute racine = profondeur 0 = même couleur ;
+- taille = détections agrégées.
 
 Lancer :  uv run python analyse/simulation_graph_v2.py
 """
@@ -112,31 +118,89 @@ for c in sorted(comps, key=lambda c: -sum(own.get(n, 0) for n in c)):
         continue
     ROOTS.append(next((n for n in c if n not in parent_de), c[0]))
 
-# ---- couleur DISTINCTE par NIVEAU dans l'arbre ----
-# un ton franc par niveau (comme la version de référence à 4 couleurs), pas un
-# dégradé et surtout PAS une couleur par thème : la couleur dit la profondeur
-NIVEAU_MAX = max(_niveau(n) for n in propre)
-NIVEAU_COULEUR = ["#059669",  # 0 vert (feuille)
-                  "#d97706",  # 1 orange
-                  "#2563eb",  # 2 bleu
-                  "#7c3aed",  # 3 violet
-                  "#db2777",  # 4 rose
-                  "#0891b2",  # 5 cyan
-                  "#65a30d",  # 6 olive
-                  "#4338ca"]  # 7 indigo (racine)
+# ---- PROFONDEUR depuis la racine de son arbre (0 = racine) ----
+# C'est ça qui donne la couleur, PAS le champ `level` de JB. Raison : les 20
+# racines sont déclarées aux levels {1,2,3,4,6,7} — deux points d'entrée
+# équivalents (sciences humaines et sociales / sciences sociales) recevaient
+# donc deux couleurs différentes. Avec la profondeur, toute racine vaut 0.
+# Bonus : la couleur d'un topic ne dépend plus de ce qui est à l'écran.
+PROFONDEUR = {}
+for _r in (n for n in propre if n not in parent_de):
+    PROFONDEUR[_r] = 0
+    _f = deque([_r])
+    while _f:
+        _x = _f.popleft()
+        for _c in enfants[_x]:
+            PROFONDEUR[_c] = PROFONDEUR[_x] + 1
+            _f.append(_c)
+PROF_MAX = max(PROFONDEUR.values())
+
+
+def _prof(n):
+    return PROFONDEUR[n]
+
+
+def _role_p(p):
+    """Nom du cran : on entre par la racine (0) et on descend vers les feuilles."""
+    return "racine" if p == 0 else f"niveau {p}"
+
+
+def _role(n):
+    return _role_p(_prof(n))
+
+
+# Ordre catégoriel validé (ΔE adjacents : 9.1 daltonisme / 19.6 vision normale).
+# Il compte : une arête relie toujours deux crans VOISINS, donc ce sont les
+# paires adjacentes qui doivent se distinguer.
+PROF_COULEUR = ["#2a78d6",  # 0 bleu — racine
+                "#eb6834",  # 1 orange
+                "#1baf7a",  # 2 aqua
+                "#eda100",  # 3 jaune
+                "#e87ba4",  # 4 magenta
+                "#008300",  # 5 vert
+                "#4a3aa7",  # 6 violet
+                "#e34948"]  # 7 rouge
 
 
 def _couleur(n):
-    return NIVEAU_COULEUR[_niveau(n) % len(NIVEAU_COULEUR)]
+    return PROF_COULEUR[_prof(n) % len(PROF_COULEUR)]
 
 
 def _legende(fig, noeuds):
-    """Une entrée de légende par NIVEAU présent (ton distinct par niveau)."""
-    for lvl in sorted({_niveau(n) for n in noeuds}):
-        etiq = " · feuille" if lvl == 0 else " · racine" if lvl == NIVEAU_MAX else ""
-        fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name=f"niveau {lvl}{etiq}",
-                                 marker=dict(size=11, color=NIVEAU_COULEUR[lvl % len(NIVEAU_COULEUR)]),
+    """Une entrée par CRAN présent, de la racine vers les feuilles."""
+    feuilles_par_prof = {p: all(not enfants[n] for n in noeuds if _prof(n) == p)
+                         for p in {_prof(n) for n in noeuds}}
+    for p in sorted(feuilles_par_prof):
+        etiq = " · feuilles" if p and feuilles_par_prof[p] else ""
+        fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name=f"{_role_p(p)}{etiq}",
+                                 marker=dict(size=11, color=PROF_COULEUR[p % len(PROF_COULEUR)]),
                                  showlegend=True))
+
+
+# ---- paliers : regrouper les 20 arbres par HAUTEUR ----
+# On a vérifié que hauteur d'un arbre == niveau de sa racine (20/20).
+# Sans ça, le secteur angulaire est alloué au prorata des feuilles : les 2 géants
+# (95 % des nœuds) écrasent les 18 autres. Le palier rééquilibre l'espace.
+def _hauteur_arbre(r):
+    d, f, mx = {r: 0}, deque([r]), 0
+    while f:
+        x = f.popleft()
+        for c in enfants[x]:
+            d[c] = d[x] + 1
+            mx = max(mx, d[c])
+            f.append(c)
+    return mx
+
+
+PALIERS = [
+    ("A", "Grands domaines", lambda h: h >= 5, 0.62),        # hauteurs 6-7  → 2 arbres
+    ("B", "Domaines intermédiaires", lambda h: 3 <= h <= 4, 0.26),  # hauteurs 3-4 → 5 arbres
+    ("C", "Fragments", lambda h: h <= 2, 0.12),              # hauteurs 1-2 → 13 arbres
+]
+HAUTEUR = {r: _hauteur_arbre(r) for r in ROOTS}
+PALIER_DE = {r: cle for r in ROOTS for cle, _, test, _ in PALIERS if test(HAUTEUR[r])}
+RACINES_PALIER = {cle: [r for r in ROOTS if PALIER_DE[r] == cle] for cle, _, _, _ in PALIERS}
+LIBELLE_PALIER = {cle: lib for cle, lib, _, _ in PALIERS}
 
 
 def _kids(n):
@@ -191,7 +255,7 @@ def _figure(focus):
         x=[pos[n][0] for n in ordre], y=[pos[n][1] for n in ordre],
         mode="markers+text", text=[_label(n) for n in ordre],
         textposition="top center", textfont=dict(size=10, color="#334155"),
-        hovertext=[f"{n}<br>niveau {_niveau(n)} · {_rec(n)} détections" for n in ordre],
+        hovertext=[f"{n}<br>{_role(n)} · {_rec(n)} détections" for n in ordre],
         hoverinfo="text", showlegend=False,
         marker=dict(size=[12 + min(_rec(n), 24) for n in ordre],
                     color=[_couleur(n) for n in ordre], line=dict(width=1.5, color="#ffffff")),
@@ -214,12 +278,24 @@ def _figure(focus):
 
 
 # ---- vue d'ensemble : squelette des sommets d'arbres ----
-def _squelette(niveau_min):
-    """Nœuds de niveau ≥ niveau_min + racines d'arbres, plafonné à APERCU_CAP
-    (les plus lourds d'abord). Chaque nœud est relié à son plus proche ancêtre gardé."""
-    keep = {n for n in propre if _niveau(n) >= niveau_min or n in ROOTS}
+def _sous_arbre(r):
+    v, f = set(), deque([r])
+    while f:
+        x = f.popleft()
+        if x in v:
+            continue
+        v.add(x)
+        f.extend(enfants[x])
+    return v
+
+
+def _squelette(prof_max, racines):
+    """Les prof_max premiers crans sous la racine, plafonné à APERCU_CAP (les
+    plus lourds d'abord). Chaque nœud est relié à son plus proche ancêtre gardé."""
+    portee = set().union(*(_sous_arbre(r) for r in racines)) if racines else set()
+    keep = {n for n in portee if _prof(n) <= prof_max}
     if len(keep) > APERCU_CAP:
-        keep = set(sorted(keep, key=_rec, reverse=True)[:APERCU_CAP]) | set(ROOTS)
+        keep = set(sorted(keep, key=_rec, reverse=True)[:APERCU_CAP]) | set(racines)
     lien = {}
     for n in keep:
         p = parent_de.get(n)
@@ -229,9 +305,30 @@ def _squelette(niveau_min):
     return keep, lien
 
 
-def _layout_foret(keep, lien):
-    """Layout radial de forêt : un secteur angulaire par arbre (largeur ∝ nb de
-    feuilles), la profondeur donne le rayon → pas de chevauchement entre arbres."""
+def _budgets(racines, poids):
+    """Fraction du cercle par arbre : d'abord un budget FIXE par palier, puis au
+    prorata à l'intérieur du palier. Sans ça les 2 géants (95 % des nœuds)
+    écrasent les 18 autres jusqu'à l'illisibilité.
+    `poids` = nb de feuilles RÉELLEMENT AFFICHÉES (pas du sous-arbre complet) :
+    sinon le secteur est calibré sur 3224 feuilles alors qu'on en dessine 40,
+    et les nœuds s'empilent."""
+    presents = [(cle, part) for cle, _, _, part in PALIERS
+                if any(PALIER_DE[r] == cle for r in racines)]
+    somme_parts = sum(p for _, p in presents) or 1
+    budgets = {}
+    for cle, part in presents:
+        grp = [r for r in racines if PALIER_DE[r] == cle]
+        s = sum(max(1, poids.get(r, 1)) for r in grp)
+        for r in grp:
+            budgets[r] = (part / somme_parts) * max(1, poids.get(r, 1)) / s
+    return budgets
+
+
+def _layout_foret(keep, lien, reserve=0.0):
+    """Layout radial de forêt : un secteur angulaire par arbre, la profondeur
+    donne le rayon → pas de chevauchement. La largeur du secteur vient du
+    PALIER (budget fixe), pas du nombre brut de feuilles.
+    `reserve` = fraction du cercle laissée libre (pour le bloc Fragments)."""
     enf = defaultdict(list)
     for n, p in lien.items():
         if p is not None:
@@ -245,7 +342,11 @@ def _layout_foret(keep, lien):
         if n not in largeur:
             largeur[n] = 1 if not enf[n] else sum(compte(c) for c in enf[n])
         return largeur[n]
-    total = sum(compte(r) for r in racines) or 1
+    for r in racines:
+        compte(r)
+
+    # budget calculé sur les feuilles AFFICHÉES (largeur), pas le sous-arbre complet
+    budgets = _budgets([r for r in racines if r in PALIER_DE], largeur)
 
     prof = {}
     def marque(n, d):
@@ -255,7 +356,9 @@ def _layout_foret(keep, lien):
     for r in racines:
         marque(r, 1)
 
-    R0 = max(1.0, max((c * 0.55) / (2 * math.pi * d) for d, c in Counter(prof.values()).items()))
+    # rayon : assez d'écart pour que deux nœuds voisins d'un même anneau ne se
+    # touchent pas (0.9 ≈ diamètre max d'un marqueur en unités de données)
+    R0 = max(1.4, max((c * 0.9) / (2 * math.pi * d) for d, c in Counter(prof.values()).items()))
     pos = {}
     def place(n, a0, a1):
         a = (a0 + a1) / 2
@@ -265,17 +368,24 @@ def _layout_foret(keep, lien):
             w = (a1 - a0) * largeur[c] / largeur[n]
             place(c, cur, cur + w)
             cur += w
-    cur = 0.0
+    # on parcourt palier par palier : les arbres d'un même palier restent voisins
+    ordre_paliers = {cle: i for i, (cle, _, _, _) in enumerate(PALIERS)}
+    racines = sorted(racines, key=lambda r: (ordre_paliers.get(PALIER_DE.get(r), 9), -_rec(r)))
+    dispo = 2 * math.pi * (1 - reserve)
+    secteurs, cur = {}, 0.0
     for r in racines:
-        w = 2 * math.pi * largeur[r] / total
+        w = dispo * budgets.get(r, 1 / len(racines))
         place(r, cur, cur + w)
+        secteurs[r] = (cur, cur + w)
         cur += w
-    return pos, enf
+    return pos, enf, secteurs
 
 
-def _figure_apercu(niveau_min):
-    keep, lien = _squelette(niveau_min)
-    pos, enf = _layout_foret(keep, lien)
+def _figure_apercu(prof_max, palier):
+    """Vue d'un palier : ses arbres, des racines jusqu'au cran prof_max."""
+    racines = RACINES_PALIER[palier]
+    keep, lien = _squelette(prof_max, racines)
+    pos, enf, secteurs = _layout_foret(keep, lien)
 
     ex, ey = [], []
     for n, p in lien.items():
@@ -293,13 +403,17 @@ def _figure_apercu(niveau_min):
         text=[(n[:24] + "…" if len(n) > 24 else n) if _rec(n) >= seuil else "" for n in ordre],
         textposition=["middle left" if pos[n][0] < 0 else "middle right" for n in ordre],
         textfont=dict(size=9, color="#334155"),
-        hovertext=[f"{n}<br>niveau {_niveau(n)} · {_rec(n)} détections" for n in ordre],
+        hovertext=[f"{n}<br>{_role(n)} · {_rec(n)} détections" for n in ordre],
         hoverinfo="text", showlegend=False,
         marker=dict(size=[8 + min(round(_rec(n) ** 0.5) * 2, 30) for n in ordre],
                     color=[_couleur(n) for n in ordre], line=dict(width=1, color="#ffffff")),
     )
     fig = go.Figure([edges, nodes])
     _legende(fig, ordre)
+    titre = f"Palier {palier} · {LIBELLE_PALIER[palier]}"
+    fig.add_annotation(x=0, y=1, xref="paper", yref="paper", text=titre,
+                       showarrow=False, xanchor="left", yanchor="bottom",
+                       font=dict(size=11, color="#52514e"))
     fig.update_layout(
         showlegend=True,
         legend=dict(orientation="v", xanchor="right", x=1, yanchor="bottom", y=0,
@@ -307,7 +421,7 @@ def _figure_apercu(niveau_min):
         xaxis=dict(visible=False),
         yaxis=dict(visible=False, scaleanchor="x", scaleratio=1),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=10, r=10, t=10, b=10), height=620,
+        margin=dict(l=10, r=10, t=30, b=10), height=620,
     )
     return fig
 
@@ -317,7 +431,8 @@ def _description(nom):
     sous = f"{len(enfants[nom])} sous-thèmes" if enfants[nom] else "aucun sous-thème (feuille)"
     return (
         f"### {nom}\n"
-        f"**Niveau** : {_niveau(nom)} / {NIVEAU_MAX} · **Parent** : {t['parent'] and by_id.get(t['parent'], {}).get('name') or '— (racine)'} · {sous}\n\n"
+        f"**{_role(nom).capitalize()}** ({_prof(nom)} cran(s) sous la racine) · "
+        f"**Parent** : {t['parent'] and by_id.get(t['parent'], {}).get('name') or '— (racine)'} · {sous}\n\n"
         f"**Détections** : {_rec(nom)} au total · {own.get(nom, 0)} sur ce topic\n\n"
         f"{t['description']}"
     )
@@ -337,35 +452,61 @@ def _occurrences(nom):
 
 
 # ---- interface ----
-# profondeur d'aperçu : à partir de quel niveau on montre le squelette
-VUE_CHOIX = {"Sommets (niveau ≥ 4)": 4, "Intermédiaire (niveau ≥ 3)": 3, "Large (niveau ≥ 2)": 2}
-VUE_DEFAUT = "Intermédiaire (niveau ≥ 3)"
+# le sélecteur d'entrée = le PALIER (groupe d'arbres). Un palier = une vue.
+# prof_max : jusqu'à quel cran sous la racine on déplie l'aperçu.
+VUE_CHOIX = {}
+for _cle, _lib, _test, _ in PALIERS:
+    _rs = RACINES_PALIER[_cle]
+    VUE_CHOIX[f"Palier {_cle} · {_lib} ({len(_rs)} arbres)"] = (2 if _cle == "A" else 3, _cle)
+VUE_DEFAUT = next(iter(VUE_CHOIX))
 
 
 def _apercu_md(vue):
-    nmin = VUE_CHOIX[vue]
-    keep, _ = _squelette(nmin)
-    dets = sum(_rec(r) for r in ROOTS)
+    prof_max, palier = VUE_CHOIX[vue]
+    dets_tot = sum(_rec(r) for r in ROOTS)
+    rs = RACINES_PALIER[palier]
+    keep, _ = _squelette(prof_max, rs)
+    dets = sum(_rec(r) for r in rs)
+    hs = sorted({HAUTEUR[r] for r in rs})
+    lignes = []
+    for cle, lib, _, _ in PALIERS:
+        g = RACINES_PALIER[cle]
+        d = sum(_rec(r) for r in g)
+        h = sorted({HAUTEUR[r] for r in g})
+        lignes.append(f"| {cle} · {lib} | {h[0]}–{h[-1]} | {len(g)} | "
+                      f"{round(100 * d / dets_tot)} % | {'**←**' if cle == palier else ''} |")
     return (
-        f"### Vue d'ensemble\n"
-        f"**{len(ROOTS)} arbres · {dets} détections** ({round(100 * dets / TOTAL_INST)} % du total) · "
-        f"{len(docs)} documents analysés sur {len(df)}\n\n"
-        f"Hiérarchie à **{NIVEAU_MAX + 1} niveaux** (0 feuille → {NIVEAU_MAX} racine). "
-        f"Le graphe montre le **squelette** ({len(keep)} nœuds de niveau ≥ {nmin}) ; "
-        f"les niveaux plus fins apparaissent au zoom. **Taille** = détections, **couleur** = niveau.\n\n"
-        f"Choisis une racine, puis descends niveau par niveau — un sélecteur apparaît à chaque cran."
+        f"### Palier {palier} · {LIBELLE_PALIER[palier]}\n"
+        f"**{len(rs)} arbres · {dets} détections** "
+        f"({round(100 * dets / dets_tot)} % du signal) · hauteur {hs[0]}–{hs[-1]}\n\n"
+        f"Aperçu : les **{prof_max + 1} premiers crans** sous la racine "
+        f"({len(keep)} nœuds) ; le reste apparaît en descendant.\n\n"
+        f"| Palier | Hauteur | Arbres | Signal | |\n|---|---|---|---|---|\n"
+        + "\n".join(lignes) + "\n\n"
+        "L'espace du cercle est réparti **par palier**, sinon les 2 géants "
+        "(95 % des nœuds) écrasent les 18 autres.\n\n"
+        "**Taille** = détections. **Couleur** = distance à la racine : toute racine "
+        "porte la même couleur, quelle que soit la hauteur de son arbre.\n\n"
+        "Choisis une racine, puis descends — un sélecteur apparaît à chaque cran."
     )
 
 
 def _lbl(node, i):
-    """Libellé du sélecteur du niveau i du chemin (racine = 0)."""
-    return "Racine · arbre" if i == 0 else f"Niveau {_niveau(node)}"
+    """Libellé du sélecteur du cran i du chemin (racine = 0)."""
+    return "Racine · arbre" if i == 0 else _role(node).capitalize()
+
+
+def _racines_du_palier(vue):
+    """Racines proposées à l'entrée : uniquement celles du palier choisi."""
+    _, palier = VUE_CHOIX[vue]
+    return RACINES_PALIER[palier]
 
 
 def update_view(path, vue):
     """Bascule l'affichage : vue d'ensemble si le chemin est vide, sinon le nœud courant."""
     if not path:
-        return _figure_apercu(VUE_CHOIX[vue]), _apercu_md(vue), ""
+        prof_max, palier = VUE_CHOIX[vue]
+        return _figure_apercu(prof_max, palier), _apercu_md(vue), ""
     node = path[-1]
     return _figure(node), _description(node), _occurrences(node)
 
@@ -375,27 +516,28 @@ with gr.Blocks(title="Doléances — thèmes") as demo:
     # chemin racine → nœud courant ; sa longueur = nb de sélecteurs affichés
     path_state = gr.State([])
 
-    vue_dd = gr.Dropdown(list(VUE_CHOIX), value=VUE_DEFAUT, label="Profondeur d'aperçu",
+    vue_dd = gr.Dropdown(list(VUE_CHOIX), value=VUE_DEFAUT, label="Palier d'entrée",
                          filterable=False)
 
-    @gr.render(inputs=path_state)
-    def cascade(path):
+    @gr.render(inputs=[path_state, vue_dd])
+    def cascade(path, vue):
         # un sélecteur par niveau du chemin (+ un pour descendre encore) ;
         # changer un sélecteur ré-enracine la descente à partir de ce niveau
+        racines = _racines_du_palier(vue)
         with gr.Row():
             if not path:
-                dd = gr.Dropdown(ROOTS, value=None, label="Racine · arbre", filterable=True)
+                dd = gr.Dropdown(racines, value=None, label="Racine · arbre", filterable=True)
                 dd.change(lambda v: [v] if v else [], dd, path_state)
             else:
                 for i, node in enumerate(path):
-                    options = ROOTS if i == 0 else _kids(path[i - 1])
+                    options = racines if i == 0 else _kids(path[i - 1])
                     dd = gr.Dropdown(options, value=node, label=_lbl(node, i), filterable=True)
                     dd.change(lambda v, p, i=i: (p[:i] + [v]) if v else p[:i],
                               [dd, path_state], path_state)
                 kids = _kids(path[-1])
                 if kids:
                     ddn = gr.Dropdown(kids, value=None, filterable=True,
-                                      label=f"Descendre · niveau {_niveau(kids[0])} ({len(kids)})")
+                                      label=f"Descendre · {_role(kids[0])} ({len(kids)})")
                     ddn.change(lambda v, p: (p + [v]) if v else p, [ddn, path_state], path_state)
 
     with gr.Row():
@@ -407,7 +549,9 @@ with gr.Blocks(title="Doléances — thèmes") as demo:
 
     sorties = [plot, description, occurrences]
     path_state.change(update_view, [path_state, vue_dd], sorties)
-    vue_dd.change(update_view, [path_state, vue_dd], sorties)
+    # changer de palier remet la navigation à zéro : les racines proposées changent
+    vue_dd.change(lambda: [], None, path_state).then(
+        update_view, [path_state, vue_dd], sorties)
     demo.load(update_view, [path_state, vue_dd], sorties)
 
 
