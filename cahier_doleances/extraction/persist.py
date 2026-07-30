@@ -5,9 +5,9 @@ from typing import cast
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from cahier_doleances.database.db import get_engine
+from cahier_doleances.database.models import Contribution, Extraction
 from cahier_doleances.extraction.settings import logger
-from database.db import get_engine
-from database.models import Contribution, Extraction
 
 
 def save_extraction(
@@ -52,9 +52,7 @@ def save_extraction(
             )
             session.add(contribution)
             session.flush()
-            logger.info(
-                "Created contribution (id=%d, city=%s)", contribution.id, city
-            )
+            logger.info("Created contribution (id=%d, city=%s)", contribution.id, city)
         else:
             logger.info("Found existing contribution (id=%d)", contribution.id)
 
