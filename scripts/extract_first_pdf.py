@@ -4,10 +4,10 @@ import sys
 
 from sqlalchemy.orm import Session
 
+from cahier_doleances.database.db import get_engine
+from cahier_doleances.database.models import Contribution, Extraction
 from cahier_doleances.extraction.discovery import first_pdf, require_path_to_data
 from cahier_doleances.extraction.extract_text import extract_pdf
-from database.db import get_engine
-from database.models import Contribution, Extraction
 
 
 def main() -> int:

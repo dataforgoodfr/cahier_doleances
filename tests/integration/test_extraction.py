@@ -6,11 +6,11 @@ import fitz
 import pytest
 from sqlalchemy.orm import Session
 
+from cahier_doleances.database.models import Contribution, Extraction
 from cahier_doleances.extraction.extract_text import (
     extract_pdf,
     text_quality_score,
 )
-from database.models import Contribution, Extraction
 
 MIN_VALID_PAGE_CHARS = 50
 MAX_EMPTY_PAGE_CHARS = 50

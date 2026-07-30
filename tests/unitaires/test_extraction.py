@@ -3,9 +3,9 @@
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from cahier_doleances.database.models import Contribution, Extraction
 from cahier_doleances.extraction.extract_text import text_quality_score
 from cahier_doleances.extraction.persist import save_extraction
-from database.models import Contribution, Extraction
 
 
 def test_text_quality_score_empty():

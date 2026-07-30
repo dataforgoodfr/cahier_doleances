@@ -1,6 +1,6 @@
 # Agent.md
 
-Repository guidance for AI coding agents working on the *cahiers de doléances* project.
+Repository guidance for AI coding agents working on the _cahiers de doléances_ project.
 
 ## Toolchain
 
@@ -25,7 +25,7 @@ Repository guidance for AI coding agents working on the *cahiers de doléances* 
 
 ## Architecture
 
-Three top-level packages, all imported as top-level modules (`from database.models import ...`, `from cahier_doleances.extraction import ...`):
+Three top-level packages, all imported as top-level modules (`from cahier_doleances.database.models import ...`, `from cahier_doleances.extraction import ...`):
 
 - `cahier_doleances/` — extraction library. Pipeline: `extraction/extract_text.py::extract_pdf` (PyMuPDF) → `extraction/persist.py::save_extraction` → DB.
 - `database/` — SQLAlchemy models (`models.py`: `Contribution`, `Extraction`, ...), engine (`db.py::get_engine`), Alembic migrations (`database/migrations/versions/`), `seed_mock.py`.
