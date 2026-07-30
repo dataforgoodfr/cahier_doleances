@@ -20,6 +20,7 @@ Lancer :  uv run python analyse/simulation_graph_v2.py
 import json
 import math
 from collections import Counter, defaultdict, deque
+from functools import partial
 from pathlib import Path
 
 import gradio as gr
@@ -491,54 +492,86 @@ def _apercu_md(vue):
     )
 
 
-def _lbl(node, i):
-    """Libellé du sélecteur du cran i du chemin (racine = 0)."""
-    return "Racine · arbre" if i == 0 else _role(node).capitalize()
+# Sélecteurs FIXES (comme la version de référence) plutôt que dynamiques : ils
+# sont créés une fois, dans une seule Row, et on les montre/masque via
+# gr.update(). PROF_MAX crans suffisent pour la branche la plus profonde.
+NB_CRANS = PROF_MAX
+
+
+def _vide(depuis):
+    """Vide et masque les sélecteurs de cran de `depuis` à la fin."""
+    return [gr.update(choices=[], value=None, visible=False)
+            for _ in range(depuis, NB_CRANS)]
+
+
+def _ouvre(focus, i):
+    """Sélecteur de cran i = les enfants de `focus` ; le reste est vidé.
+    Renvoie exactement NB_CRANS - i mises à jour."""
+    if i >= NB_CRANS:
+        return []
+    kids = _kids(focus)
+    if not kids:
+        return _vide(i)
+    tete = gr.update(choices=kids, value=None, visible=True,
+                     label=f"Descendre · {_role(kids[0])} ({len(kids)})")
+    return [tete] + _vide(i + 1)
+
+
+# sentinelle du 1er sélecteur : revenir à la structure d'ensemble du palier
+# (reprend le code de navigation de la version de référence)
+APERCU = "— Vue d'ensemble —"
 
 
 def _racines_du_palier(vue):
-    """Racines proposées à l'entrée : uniquement celles du palier choisi."""
+    """Racines proposées à l'entrée : celles du palier, + le retour à l'aperçu."""
     _, palier = VUE_CHOIX[vue]
-    return RACINES_PALIER[palier]
+    return [APERCU] + RACINES_PALIER[palier]
 
 
-def update_view(path, vue):
-    """Bascule l'affichage : vue d'ensemble si le chemin est vide, sinon le nœud courant."""
-    if not path:
-        prof_max, palier = VUE_CHOIX[vue]
-        return _figure_apercu(prof_max, palier), _apercu_md(vue), ""
-    node = path[-1]
-    return _figure(node), _description(node), _occurrences(node)
+def _apercu(vue):
+    """Retour à la structure d'ensemble du palier : aucun nœud en focus."""
+    prof_max, palier = VUE_CHOIX[vue]
+    return (_figure_apercu(prof_max, palier), _apercu_md(vue), "", None, *_vide(0))
+
+
+def _aller(node, i):
+    """Focus sur `node` ; le sélecteur de cran i propose ses enfants."""
+    return (_figure(node), _description(node), _occurrences(node), node, *_ouvre(node, i))
+
+
+def on_palier(vue):
+    """Changer de palier : la liste des racines change, la navigation repart à zéro."""
+    return (gr.update(choices=_racines_du_palier(vue), value=APERCU), *_apercu(vue))
+
+
+def on_racine(root, vue):
+    if not root or root == APERCU:
+        return _apercu(vue)
+    return _aller(root, 0)
+
+
+def on_cran(node, i):
+    """Descente depuis le cran i : focus sur `node`, on ouvre le cran i+1.
+    Les crans 0..i gardent leur valeur (gr.update() vide = inchangé)."""
+    if not node:                       # reset programmatique : on ne touche à rien
+        return (gr.update(),) * (4 + NB_CRANS)
+    fig, desc, occ, focus, *suite = _aller(node, i + 1)
+    return (fig, desc, occ, focus, *([gr.update()] * (i + 1)), *suite)
 
 
 with gr.Blocks(title="Doléances — thèmes") as demo:
     gr.Markdown("### Cahiers de doléances — exploration des thèmes (POC · données v3, 8 niveaux)")
-    # chemin racine → nœud courant ; sa longueur = nb de sélecteurs affichés
-    path_state = gr.State([])
+    focus_state = gr.State()
 
-    vue_dd = gr.Dropdown(list(VUE_CHOIX), value=VUE_DEFAUT, label="Palier d'entrée",
-                         filterable=False)
-
-    @gr.render(inputs=[path_state, vue_dd])
-    def cascade(path, vue):
-        # un sélecteur par niveau du chemin (+ un pour descendre encore) ;
-        # changer un sélecteur ré-enracine la descente à partir de ce niveau
-        racines = _racines_du_palier(vue)
-        with gr.Row():
-            if not path:
-                dd = gr.Dropdown(racines, value=None, label="Racine · arbre", filterable=True)
-                dd.change(lambda v: [v] if v else [], dd, path_state)
-            else:
-                for i, node in enumerate(path):
-                    options = racines if i == 0 else _kids(path[i - 1])
-                    dd = gr.Dropdown(options, value=node, label=_lbl(node, i), filterable=True)
-                    dd.change(lambda v, p, i=i: (p[:i] + [v]) if v else p[:i],
-                              [dd, path_state], path_state)
-                kids = _kids(path[-1])
-                if kids:
-                    ddn = gr.Dropdown(kids, value=None, filterable=True,
-                                      label=f"Descendre · {_role(kids[0])} ({len(kids)})")
-                    ddn.change(lambda v, p: (p + [v]) if v else p, [ddn, path_state], path_state)
+    # UNE seule ligne de sélecteurs FIXES, comme la version de référence :
+    # Palier (≈ Profondeur) | Racine · arbre | les crans successifs (masqués au départ)
+    with gr.Row():
+        palier_dd = gr.Dropdown(list(VUE_CHOIX), value=VUE_DEFAUT, label="Palier d'entrée",
+                                filterable=False, scale=1)
+        racine_dd = gr.Dropdown(_racines_du_palier(VUE_DEFAUT), value=APERCU,
+                                label="Racine · arbre", filterable=True, scale=1)
+        crans_dd = [gr.Dropdown(label=f"Cran {i + 1}", filterable=True, visible=False, scale=1)
+                    for i in range(NB_CRANS)]
 
     with gr.Row():
         with gr.Column(scale=2):
@@ -547,12 +580,13 @@ with gr.Blocks(title="Doléances — thèmes") as demo:
             description = gr.Markdown()
             occurrences = gr.Markdown()
 
-    sorties = [plot, description, occurrences]
-    path_state.change(update_view, [path_state, vue_dd], sorties)
-    # changer de palier remet la navigation à zéro : les racines proposées changent
-    vue_dd.change(lambda: [], None, path_state).then(
-        update_view, [path_state, vue_dd], sorties)
-    demo.load(update_view, [path_state, vue_dd], sorties)
+    vue_sorties = [plot, description, occurrences, focus_state, *crans_dd]
+    palier_dd.change(on_palier, palier_dd, [racine_dd, *vue_sorties])
+    racine_dd.change(on_racine, [racine_dd, palier_dd], vue_sorties)
+    # descendre depuis le cran i ouvre le cran i+1 ; les crans 0..i restent tels quels
+    for _i, _dd in enumerate(crans_dd):
+        _dd.change(partial(on_cran, i=_i), _dd, vue_sorties)
+    demo.load(on_palier, palier_dd, [racine_dd, *vue_sorties])
 
 
 if __name__ == "__main__":
