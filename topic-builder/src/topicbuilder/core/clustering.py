@@ -2,10 +2,120 @@ import math
 import random
 from difflib import SequenceMatcher
 
+import faiss
+import numpy as np
+import umap
+from openai import OpenAI
+from sklearn.cluster import HDBSCAN
+
 from topicbuilder.core.schemas import Taxonomy, Topic
+from topicbuilder.core.utils import TEST_TEXTS, clean_before_embedding
+
+# Ollama must be installed aside with bge-m3 installed
+# https://ollama.com/library/bge-m3
+client = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama",
+)
+
+# Semantic Configuration
+EMBEDDING_BATCH_SIZE = 20
+EMBEDDING_MODEL_NAME = "bge-m3"
+UMAP_N_COMPONENTS = 15
+UMAP_N_NEIGHBOURS = 15
+MIN_CLUSTER_SIZE = 15
+MIN_SAMPLES = 1
+CLUSTER_SELECTION_EPSILON = 0.05
 
 
-# TODO: do semantic clustering that scales as the list of texts grows
+def cluster_texts_umap_hdbscan(
+    texts,
+    embeddings,
+    n_components=UMAP_N_COMPONENTS,  # Taille de l'espace réduit (ex: 5 dimensions)
+    n_neighbours=UMAP_N_COMPONENTS,  # Taille de l'espace de recherche autour des vecteurs
+    min_cluster_size=MIN_CLUSTER_SIZE,  # Taille min pour former un groupe
+    min_samples=MIN_SAMPLES,  # Contrôle du bruit (1 = très permissif)
+    cluster_selection_epsilon=CLUSTER_SELECTION_EPSILON,  # Tolérance pour étendre les clusters
+):
+    """
+    Reduce vectors dimension with UMAP and clusterise with HDBSCAN
+    """
+
+    # Reduce vectors dimension 1024 (for bge model) to 15
+    reducer = umap.UMAP(
+        n_components=n_components,
+        n_neighbors=n_neighbours,
+        min_dist=0.1,
+        metric="cosine",
+        random_state=42,
+    )
+    reduced_embeddings = reducer.fit_transform(embeddings)
+
+    # HDBSCAN Configuration
+    hdbscan_model = HDBSCAN(
+        min_cluster_size=min_cluster_size,
+        min_samples=min_samples,
+        cluster_selection_epsilon=cluster_selection_epsilon,
+        metric="euclidean",
+    )
+
+    # HDBSCAN running on reduced embeddings
+    labels = hdbscan_model.fit_predict(reduced_embeddings)
+
+    clusters = {}
+    remaining_vectors = []
+
+    # Gather results per cluster in a dict
+    for texte, label in zip(texts, labels, strict=False):
+        if label == -1:
+            remaining_vectors.append(texte)
+        else:
+            cluster_name = f"Cluster_{label + 1}"
+            if cluster_name not in clusters:
+                clusters[cluster_name] = []
+            clusters[cluster_name].append(texte)
+
+    return clusters, remaining_vectors
+
+
+def get_embeddings(texts, model_name=EMBEDDING_MODEL_NAME, batch_size=EMBEDDING_BATCH_SIZE):
+    """
+    Generate embeddings per batch and normalize them with FAISS
+    """
+    all_embeddings = []
+    total_texts = len(texts)
+
+    for i in range(0, total_texts, batch_size):
+        batch_texts = texts[i : i + batch_size]
+        batch_texts = [clean_before_embedding(text) for text in batch_texts]
+
+        # Embedding
+        response = client.embeddings.create(model=model_name, input=batch_texts)
+        batch_embeddings = np.array([item.embedding for item in response.data], dtype="float32")
+
+        # Normalize embeddings
+        faiss.normalize_L2(batch_embeddings)
+        all_embeddings.append(batch_embeddings)
+
+    # Gathering embeddings
+    full_embeddings = np.vstack(all_embeddings)
+
+    return full_embeddings
+
+
+def clusterize_semantic(texts: list[str]) -> list[list[str]]:
+    """
+    Get semantic clustering from texts.
+    """
+    if not texts:
+        return []
+    embeddings = get_embeddings(texts=texts)
+    clusters_final, topics_restants = cluster_texts_umap_hdbscan(
+        texts=texts, embeddings=embeddings, n_components=15, min_cluster_size=15, min_samples=1
+    )
+    return list(clusters_final.values()) + topics_restants
+
+
 def clusterize(texts: list[str], n: int, seed: int = 0) -> list[list[str]]:
     """
     Partition `texts` into consecutive chunks of at most `n` items each,
@@ -85,3 +195,29 @@ def chunk_text(text: str, chunk_max_words: int) -> list[str]:
             n_word = len(sent)
     all_chunks.append(tmp_chunks)
     return ["\n".join(" ".join(sent) for sent in chunk) for chunk in all_chunks]
+
+
+if __name__ == "__main__":
+    print("Embedding...")
+    embeddings = get_embeddings(texts=TEST_TEXTS)
+
+    print("Clusterize...")
+    clusters_final, topics_restants = cluster_texts_umap_hdbscan(
+        texts=TEST_TEXTS,
+        embeddings=embeddings,
+    )
+
+    print("\n================ RÉSULTATS UMAP + HDBSCAN ================")
+    print(f"Nombre de clusters formés : {len(clusters_final)}")
+    print(f"Nombre de restants (bruit) : {len(topics_restants)}")
+    print(type(clusters_final))
+    print(type(topics_restants))
+
+    for nom_cluster, contenu in list(clusters_final.items()):
+        print(f"\n{nom_cluster} ({len(contenu)} éléments) :")
+        for t in contenu:
+            print(f"  - {t}")
+    if topics_restants:
+        print(f"\nTopics restants / Bruit (-1) ({len(topics_restants)} éléments) :")
+        for texte in topics_restants:
+            print(f"  - {texte}")

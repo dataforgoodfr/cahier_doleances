@@ -23,6 +23,9 @@ dependencies = [
     "dash-bootstrap-components>=1.6.0",
     "pandas>=3.0.3",
     "loguru>=0.7.3",
+    "faiss-cpu>=1.14.3",
+    "scikit-learn>=1.9.0",
+    "umap-learn>=0.5.12",
 ]
 
 [dependency-groups]
