@@ -1,7 +1,7 @@
 // Le serveur renvoie l'état complet (figure, panneau, sélecteurs) ; on l'affiche.
 
-let CONFIG = { apercu: "", paliers: [] };
-let palier = null;
+let CONFIG = { apercu: "", strates: [] };
+let strate = null;
 
 const $ = (id) => document.getElementById(id);
 const etat = (texte) => { $("etat").textContent = texte; };
@@ -21,12 +21,12 @@ function dessineBarre(niveaux) {
   const barre = $("barre");
   barre.innerHTML = "";
   barre.appendChild(
-    champ("Palier d'entrée", CONFIG.paliers, palier, (v) => chargeApercu(v)),
+    champ("Strate d'entrée", CONFIG.strates, strate, (v) => chargeApercu(v)),
   );
   for (const niveau of niveaux) {
     barre.appendChild(
       champ(niveau.label, niveau.options, niveau.value, (v) => {
-        if (!v || v === CONFIG.apercu) chargeApercu(palier);
+        if (!v || v === CONFIG.apercu) chargeApercu(strate);
         else chargeNoeud(v);
       }),
     );
@@ -84,16 +84,16 @@ function applique(reponse) {
     etat(reponse.erreur);
     return;
   }
-  palier = reponse.palier;
+  strate = reponse.strate;
   dessineGraphe(reponse.figure);
   dessineBarre(reponse.niveaux);
   $("panneau").innerHTML = reponse.description + reponse.occurrences;
 }
 
 async function chargeApercu(cle) {
-  palier = cle;
-  etat(`Palier ${cle} — clique un nœud pour entrer dedans.`);
-  applique(await poste("/api/apercu", { palier: cle }));
+  strate = cle;
+  etat(`Strate ${cle} — clique un nœud pour entrer dedans.`);
+  applique(await poste("/api/apercu", { strate: cle }));
 }
 
 async function chargeNoeud(nom) {
@@ -103,7 +103,7 @@ async function chargeNoeud(nom) {
 
 async function demarre() {
   CONFIG = await (await fetch("/api/config")).json();
-  await chargeApercu(CONFIG.paliers[0].value);
+  await chargeApercu(CONFIG.strates[0].value);
 }
 
 demarre().catch((e) => etat(`Erreur : ${e.message}`));

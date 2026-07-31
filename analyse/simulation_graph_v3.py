@@ -1,11 +1,3 @@
-"""Vue topic des cahiers de doléances (données v3).
-
-Sert une page maison (static/) qui charge Plotly et écoute plotly_click :
-gr.Plot n'expose pas d'évènement de clic.
-
-Lancer :  uv run python analyse/simulation_graph_v3.py   -> http://127.0.0.1:7861
-          PORT=7999 pour changer de port
-"""
 import json
 import math
 import os
@@ -21,8 +13,8 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 
 import gradio as gr
 
-RADIUS = 2        # profondeur du voisinage affiché autour du focus
-CAP = 45          # plafond de nœuds dans le voisinage
+RADIUS = 2 # profondeur du voisinage affiché autour du focus
+CAP = 45 # plafond de nœuds dans le voisinage
 APERCU_CAP = 260  # plafond de nœuds dans la vue d'ensemble
 
 BASE = Path(__file__).parent
@@ -167,7 +159,7 @@ def _couleur(n):
     return PROF_COULEUR[_prof(n) % len(PROF_COULEUR)]
 
 
-# --- 4. paliers ---
+# --- 4. strates ---
 def _hauteur_arbre(r):
     d, f, mx = {r: 0}, deque([r]), 0
     while f:
@@ -179,18 +171,19 @@ def _hauteur_arbre(r):
     return mx
 
 
-PALIERS = [
+# strates de forêt : elles se définissent par la hauteur, comme notre critère
+STRATES = [
     # clé, libellé, test sur la hauteur, part du cercle allouée
-    ("A", "Grands domaines", lambda h: h >= 5, 0.62),               # hauteurs 6-7  -> 2 arbres
-    ("B", "Domaines intermédiaires", lambda h: 3 <= h <= 4, 0.26),  # hauteurs 3-4  -> 5 arbres
-    ("C", "Fragments", lambda h: h <= 2, 0.12),                     # hauteurs 1-2  -> 13 arbres
+    ("A", "Canopée", lambda h: h >= 5, 0.62),          # hauteurs 6-7  -> 2 arbres
+    ("B", "Sous-bois", lambda h: 3 <= h <= 4, 0.26),   # hauteurs 3-4  -> 5 arbres
+    ("C", "Semis", lambda h: h <= 2, 0.12),            # hauteurs 1-2  -> 13 arbres
 ]
 HAUTEUR = {r: _hauteur_arbre(r) for r in ROOTS}
-PALIER_DE = {r: cle for r in ROOTS for cle, _, test, _ in PALIERS if test(HAUTEUR[r])}
-RACINES_PALIER = {cle: [r for r in ROOTS if PALIER_DE[r] == cle] for cle, _, _, _ in PALIERS}
-LIBELLE_PALIER = {cle: lib for cle, lib, _, _ in PALIERS}
+STRATE_DE = {r: cle for r in ROOTS for cle, _, test, _ in STRATES if test(HAUTEUR[r])}
+RACINES_STRATE = {cle: [r for r in ROOTS if STRATE_DE[r] == cle] for cle, _, _, _ in STRATES}
+LIBELLE_STRATE = {cle: lib for cle, lib, _, _ in STRATES}
 
-PROF_APERCU = {"A": 2, "B": 3, "C": 3}   # crans dépliés dans l'aperçu, par palier
+PROF_APERCU = {"A": 2, "B": 3, "C": 3}   # crans dépliés dans l'aperçu, par strate
 APERCU = "— Vue d'ensemble —"            # sentinelle du 1er sélecteur
 
 
@@ -212,15 +205,15 @@ def _squelette(prof_max, racines):
 
 
 def _budgets(racines, poids):
-    """Part du cercle par arbre : budget fixe par palier, puis au prorata dedans.
+    """Part du cercle par arbre : budget fixe par strate, puis au prorata dedans.
     `poids` = feuilles affichées, pas le sous-arbre complet, sinon le secteur est
     calibré sur 3224 feuilles alors qu'on en dessine 40."""
-    presents = [(cle, part) for cle, _, _, part in PALIERS
-                if any(PALIER_DE[r] == cle for r in racines)]
+    presents = [(cle, part) for cle, _, _, part in STRATES
+                if any(STRATE_DE[r] == cle for r in racines)]
     somme_parts = sum(p for _, p in presents) or 1
     budgets = {}
     for cle, part in presents:
-        grp = [r for r in racines if PALIER_DE[r] == cle]
+        grp = [r for r in racines if STRATE_DE[r] == cle]
         s = sum(max(1, poids.get(r, 1)) for r in grp)
         for r in grp:
             budgets[r] = (part / somme_parts) * max(1, poids.get(r, 1)) / s
@@ -245,7 +238,7 @@ def _layout_foret(keep, lien):
     for r in racines:
         compte(r)
 
-    budgets = _budgets([r for r in racines if r in PALIER_DE], largeur)
+    budgets = _budgets([r for r in racines if r in STRATE_DE], largeur)
 
     prof = {}
     def marque(n, d):
@@ -267,9 +260,9 @@ def _layout_foret(keep, lien):
             place(c, cur, cur + w)
             cur += w
 
-    # palier par palier : les arbres d'un même palier restent voisins à l'écran
-    ordre_paliers = {cle: i for i, (cle, _, _, _) in enumerate(PALIERS)}
-    racines = sorted(racines, key=lambda r: (ordre_paliers.get(PALIER_DE.get(r), 9), -_rec(r)))
+    # strate par strate : les arbres d'un même strate restent voisins à l'écran
+    ordre_strates = {cle: i for i, (cle, _, _, _) in enumerate(STRATES)}
+    racines = sorted(racines, key=lambda r: (ordre_strates.get(STRATE_DE.get(r), 9), -_rec(r)))
     cur = 0.0
     for r in racines:
         w = 2 * math.pi * budgets.get(r, 1 / len(racines))
@@ -328,8 +321,8 @@ def _mise_en_page(fig, hauteur, egaliser):
     return fig
 
 
-def figure_apercu(palier):
-    keep, lien = _squelette(PROF_APERCU[palier], RACINES_PALIER[palier])
+def figure_apercu(strate):
+    keep, lien = _squelette(PROF_APERCU[strate], RACINES_STRATE[strate])
     pos = _layout_foret(keep, lien)
     noms = list(keep)
     seuil = sorted((_rec(n) for n in noms), reverse=True)[:22][-1] if len(noms) > 22 else 0
@@ -418,34 +411,32 @@ def _html_occurrences(nom):
     return "<h4>Occurrences dans les textes</h4>" + "".join(blocs)
 
 
-def _html_apercu(palier):
-    rs = RACINES_PALIER[palier]
+def _html_apercu(strate):
+    rs = RACINES_STRATE[strate]
     total = sum(_rec(r) for r in ROOTS)
     dets = sum(_rec(r) for r in rs)
     hs = sorted({HAUTEUR[r] for r in rs})
-    keep, _ = _squelette(PROF_APERCU[palier], rs)
+    keep, _ = _squelette(PROF_APERCU[strate], rs)
 
     lignes = []
-    for cle, lib, _test, _part in PALIERS:
-        g = RACINES_PALIER[cle]
+    for cle, lib, _test, _part in STRATES:
+        g = RACINES_STRATE[cle]
         d = sum(_rec(r) for r in g)
         h = sorted({HAUTEUR[r] for r in g})
-        courant = " class='ici'" if cle == palier else ""
+        courant = " class='ici'" if cle == strate else ""
         lignes.append(f"<tr{courant}><td>{cle} · {lib}</td><td>{h[0]}–{h[-1]}</td>"
                       f"<td>{len(g)}</td><td>{round(100 * d / total)} %</td></tr>")
 
     return (
-        f"<h3>Palier {palier} · {LIBELLE_PALIER[palier]}</h3>"
+        f"<h3>Strate {strate} · {LIBELLE_STRATE[strate]}</h3>"
         f"<p><b>{len(rs)} arbres · {dets} détections</b> "
         f"({round(100 * dets / total)} % du signal) · hauteur {hs[0]}–{hs[-1]}</p>"
-        f"<p class='meta'>Aperçu : les <b>{PROF_APERCU[palier] + 1} premiers crans</b> sous la "
+        f"<p class='meta'>Aperçu : les <b>{PROF_APERCU[strate] + 1} premiers crans</b> sous la "
         f"racine ({len(keep)} nœuds) ; le reste apparaît en descendant.</p>"
-        "<table><thead><tr><th>Palier</th><th>Hauteur</th><th>Arbres</th><th>Signal</th></tr>"
+        "<table><thead><tr><th>Strate</th><th>Hauteur</th><th>Arbres</th><th>Signal</th></tr>"
         "</thead><tbody>" + "".join(lignes) + "</tbody></table>"
         "<p class='meta'><b>Taille</b> = détections. <b>Couleur</b> = distance à la racine : "
         "toute racine porte la même couleur, quelle que soit la hauteur de son arbre.</p>"
-        "<p class='meta'>Clique un nœud du graphe — ou passe par les sélecteurs : "
-        "les deux restent synchronisés.</p>"
     )
 
 
@@ -464,14 +455,14 @@ def _opt(nom, avec_topics=False):
     return {"value": nom, "label": f"{nom} · {detail}{_rec(nom)} détections"}
 
 
-def _options_racines(palier):
+def _options_racines(strate):
     return ([{"value": APERCU, "label": APERCU}]
-            + [_opt(r, avec_topics=True) for r in RACINES_PALIER[palier]])
+            + [_opt(r, avec_topics=True) for r in RACINES_STRATE[strate]])
 
 
-def _cascade(chemin, palier):
+def _cascade(chemin, strate):
     """Toute la ligne de sélecteurs pour un chemin donné."""
-    racines = _options_racines(palier)
+    racines = _options_racines(strate)
     niveaux = []
     for i, node in enumerate(chemin):
         options = racines if i == 0 else [_opt(k) for k in _kids(chemin[i - 1])]
@@ -497,21 +488,21 @@ _NO_STORE = {"Cache-Control": "no-store"}   # recharger reprend les static/ à j
 def api_config():
     return {
         "apercu": APERCU,
-        "paliers": [{"value": cle, "label": f"{cle} · {LIBELLE_PALIER[cle]}"}
+        "strates": [{"value": cle, "label": f"{cle} · {LIBELLE_STRATE[cle]}"}
                     for cle in PROF_APERCU],
     }
 
 
 @app.post("/api/apercu")
-def api_apercu(palier: str = Body(..., embed=True)):
-    if palier not in RACINES_PALIER:
-        return {"erreur": f"palier inconnu : {palier}"}
+def api_apercu(strate: str = Body(..., embed=True)):
+    if strate not in RACINES_STRATE:
+        return {"erreur": f"strate inconnue : {strate}"}
     return {
-        "figure": figure_apercu(palier).to_plotly_json(),
-        "description": _html_apercu(palier),
+        "figure": figure_apercu(strate).to_plotly_json(),
+        "description": _html_apercu(strate),
         "occurrences": "",
-        "palier": palier,
-        "niveaux": _cascade([], palier),
+        "strate": strate,
+        "niveaux": _cascade([], strate),
     }
 
 
@@ -521,13 +512,13 @@ def api_noeud(nom: str = Body(..., embed=True)):
     if nom not in propre:
         return {"erreur": f"topic inconnu : {nom}"}
     chemin = _chemin(nom)
-    palier = PALIER_DE.get(chemin[0], "A")
+    strate = STRATE_DE.get(chemin[0], "A")
     return {
         "figure": figure_noeud(nom).to_plotly_json(),
         "description": _html_description(nom),
         "occurrences": _html_occurrences(nom),
-        "palier": palier,
-        "niveaux": _cascade(chemin, palier),
+        "strate": strate,
+        "niveaux": _cascade(chemin, strate),
     }
 
 
