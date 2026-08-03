@@ -1,8 +1,12 @@
 import gradio as gr
 from data_helpers import (
-    PDF_DIR, get_contribution,
-    list_communes, list_contributions, save_annotation
+    PDF_DIR,
+    get_contribution,
+    list_communes,
+    list_contributions,
+    save_annotation,
 )
+
 
 def pdf_html(pdf_file: str | None) -> str:
     if not pdf_file:

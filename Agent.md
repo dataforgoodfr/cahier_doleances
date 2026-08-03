@@ -46,7 +46,7 @@ End-to-end flow: PDF → text extraction → persisted to PostgreSQL → browse/
 
 ## Tests
 
-Framework: **pytest**, **functions only** (no `unittest.TestCase`).
+Framework: **pytest**, **functions only** (no classes, no `unittest.TestCase`). Write tests as top-level `def test_...` functions — do not group them in test classes.
 
 - `@pytest.mark.parametrize` for one behavior across multiple inputs — don't duplicate tests or put `if/else` branches in a test body.
 - One test = one behavior; several small parametrized tests beat one big assertion cascade.

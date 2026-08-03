@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -28,6 +28,25 @@ class Extraction(Base):
     text = Column(Text)
     num_words = Column(Integer)
     num_lines = Column(Integer)
+
+
+class PageExtraction(Base):
+    """Page-by-page extracted text with quality scoring and an OCR flag.
+
+    One row per persisted PDF page. Metadata pages (first two) are not inserted
+    here; they are only used to extract ``city``.
+    """
+
+    __tablename__ = "page_extraction"
+
+    id = Column(Integer, primary_key=True)
+    contribution_id = Column(Integer, ForeignKey("contribution.id"))
+    pdf_name = Column(String)
+    page_number = Column(Integer)
+    text = Column(Text)  # texte extrait et nettoyé
+    quality_score = Column(Float)  # 0.0 (garbage) à 1.0 (texte propre)
+    needs_ocr = Column(Boolean)  # page manuscrite suspectée
+    city = Column(String)  # ville extraite
 
 
 # Table de référence TODO: demander pour compléter ceci avec les datas

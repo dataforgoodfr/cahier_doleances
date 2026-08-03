@@ -6,72 +6,99 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from cahier_doleances.database.db import get_engine
-from cahier_doleances.database.models import Contribution, Extraction
+from cahier_doleances.database.models import Contribution, PageExtraction
 from cahier_doleances.extraction.settings import logger
 
 
-def save_extraction(
+def save_page_extractions(
     pdf_name: str,
     city: str,
-    page_count: int,
-    text: str,
+    pages: list[dict],
     *,
-    ocr: str = "pymupdf",
     engine: Engine | None = None,
 ) -> int:
-    """Persist an extraction to the database.
+    """Persist page-by-page extractions into the ``page_extraction`` table.
 
-    Creates a ``Contribution`` row if one does not already exist for this PDF,
-    then creates an ``Extraction`` row linked to it.
+    Creates or reuses a ``Contribution`` (key: ``pdf_file``), populates
+    ``city`` and ``is_handwritten`` (True if at least one page is suspected
+    handwritten), then inserts one ``PageExtraction`` row per provided page.
+
+    If page extractions for this PDF already exist in the database, the import
+    is skipped and an error is logged (delete the existing rows first to
+    re-extract).
 
     Args:
-        pdf_name: Filename of the PDF (used to look up an existing contribution).
-        city: City or department code associated with the contribution.
-        page_count: Number of pages in the PDF.
-        text: Extracted text content.
-        ocr: OCR engine identifier (default ``"pymupdf"``).
+        pdf_name: PDF file name.
+        city: City extracted from the metadata pages (empty if not found).
+        pages: List of dicts ``(page_number, text, quality_score, needs_ocr)``
+            representing the pages to persist.
+        engine: Optional SQLAlchemy engine.
 
     Returns:
-        The primary key of the newly created ``Extraction`` row.
+        The ID of the created/reused ``Contribution``.
     """
     if engine is None:
         engine = get_engine()
 
     with Session(engine) as session:
+        existing_page = (
+            session.query(PageExtraction).filter_by(pdf_name=pdf_name).first()
+        )
+        if existing_page is not None:
+            logger.error(
+                "PDF already extracted: %s (contribution id=%d) — skipping. "
+                "Delete the existing rows to re-extract.",
+                pdf_name,
+                existing_page.contribution_id,
+            )
+            return cast(int, existing_page.contribution_id)
+
         contribution: Contribution | None = (
             session.query(Contribution).filter_by(pdf_file=pdf_name).first()
         )
+
+        any_ocr = any(p.get("needs_ocr") for p in pages)
 
         if contribution is None:
             contribution = Contribution(
                 city=city,
                 pdf_file=pdf_name,
-                start_page=1,
-                end_page=page_count,
-                is_handwritten=False,
+                start_page=pages[0]["page_number"] if pages else 1,
+                end_page=pages[-1]["page_number"] if pages else 0,
+                is_handwritten=any_ocr,
             )
             session.add(contribution)
             session.flush()
-            logger.info("Created contribution (id=%d, city=%s)", contribution.id, city)
+            logger.info(
+                "Created contribution (id=%d, city=%s)", contribution.id, city or ""
+            )
         else:
+            contribution.city = city or contribution.city
+            contribution.is_handwritten = any_ocr or bool(contribution.is_handwritten)
+            if pages:
+                contribution.start_page = pages[0]["page_number"]
+                contribution.end_page = pages[-1]["page_number"]
             logger.info("Found existing contribution (id=%d)", contribution.id)
 
-        extraction = Extraction(
-            contribution_id=contribution.id,
-            ocr=ocr,
-            text=text,
-            num_words=len(text.split()),
-            num_lines=text.count("\n") + 1,
-        )
-        session.add(extraction)
+        for p in pages:
+            session.add(
+                PageExtraction(
+                    contribution_id=contribution.id,
+                    pdf_name=pdf_name,
+                    page_number=p["page_number"],
+                    text=p["text"],
+                    quality_score=p["quality_score"],
+                    needs_ocr=bool(p.get("needs_ocr")),
+                    city=city,
+                )
+            )
+
         session.commit()
 
-        extraction_id = cast(int, extraction.id)
         logger.info(
-            "Extraction done: %d words, %d lines (extraction id=%d)",
-            extraction.num_words,
-            extraction.num_lines,
-            extraction.id,
+            "Page extractions done: %d pages persisted (contribution id=%d)",
+            len(pages),
+            contribution.id,
         )
 
-    return extraction_id
+    return cast(int, contribution.id)

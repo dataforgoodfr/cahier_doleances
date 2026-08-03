@@ -16,6 +16,7 @@ def timed(_func=None):
 
     Only logs at ``INFO`` level via the module-level logger.
     """
+
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -24,6 +25,7 @@ def timed(_func=None):
             dt = time.perf_counter() - t0
             logger.info("%s took %.2fs", func.__name__, dt)
             return result
+
         return wrapper
 
     return decorator if _func is None else decorator(_func)

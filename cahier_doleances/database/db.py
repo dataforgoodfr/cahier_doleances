@@ -5,20 +5,25 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 
 def get_url() -> URL:
-    """Build a PostgreSQL connection URL from environment variables.
+    """Build a SQLAlchemy connection URL from environment variables.
 
-    Expects ``DB_USER``, ``DB_PASSWORD``, ``DB_HOST``, ``DB_PORT`` and
-    ``DB_NAME`` to be set (e.g. in a ``.env`` file).
+    If ``DATABASE_URL`` is set (e.g. ``sqlite:///./cahier.db``), it is used
+    directly — convenient for local SQLite development without Postgres.
+    Otherwise, builds a ``postgresql+psycopg2`` URL from ``DB_USER``,
+    ``DB_PASSWORD``, ``DB_HOST``, ``DB_PORT`` and ``DB_NAME``.
 
     Returns:
-        A fully-formed ``sqlalchemy.engine.URL`` for ``postgresql+psycopg2``.
+        A fully-formed ``sqlalchemy.engine.URL``.
     """
+    raw = os.environ.get("DATABASE_URL")
+    if raw:
+        return make_url(raw)
     return URL.create(
         drivername="postgresql+psycopg2",
         username=os.environ["DB_USER"],
