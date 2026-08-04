@@ -195,6 +195,7 @@ dependencies = [
     { name = "requests" },
     { name = "ruff" },
     { name = "sqlalchemy" },
+    { name = "tqdm" },
     { name = "ty" },
     { name = "wordfreq" },
 ]
@@ -225,6 +226,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.3" },
     { name = "ruff" },
     { name = "sqlalchemy", specifier = ">=2.0.44" },
+    { name = "tqdm", specifier = ">=4.68.0" },
     { name = "ty" },
     { name = "wordfreq", specifier = ">=3.1" },
 ]

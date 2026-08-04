@@ -26,6 +26,7 @@ dependencies = [
     "requests>=2.32.3",
     "sqlalchemy>=2.0.44",
     "ruff",
+    "tqdm>=4.68.0",
     "ty",
     "wordfreq>=3.1",
 ]
