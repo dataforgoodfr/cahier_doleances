@@ -15,7 +15,7 @@ from cahier_doleances.database.models import Contribution, PageExtraction
 from cahier_doleances.extraction.discovery import list_pdfs, require_path_to_data
 from cahier_doleances.extraction.extract_text import extract_pdf_pages
 from cahier_doleances.utils.timing import timed
-
+from cahier_doleances.config import logger
 
 @timed
 def main() -> int:
@@ -62,8 +62,7 @@ def main() -> int:
                     select(func.count(PageExtraction.id)).where(
                         PageExtraction.contribution_id == contribution_id
                     )
-                )
-                .scalar()
+                ).scalar()
                 or 0
             )
 
