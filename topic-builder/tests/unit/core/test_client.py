@@ -15,31 +15,36 @@ class StubArgs(BaseModel):
 
 
 @pytest.mark.parametrize(
-    "backend, expected_cls, endpoint_args",
+    "backend, endpoint_args, expected",
     [
-        ("default", AsyncOpenAI, {}),
-        ("azure", AsyncAzureOpenAI, {"azure_endpoint": "https://example.com", "api_version": "2024-01-01"}),
+        ("default", {}, AsyncOpenAI),
+        ("azure", {"azure_endpoint": "https://example.com", "api_version": "2024-01-01"}, AsyncAzureOpenAI),
+        ("unknown", {}, ValueError),
     ],
 )
-def test_init_client_returns_expected_backend_class(backend, expected_cls, endpoint_args):
-    client = LLMClient.init_client(backend, api_key_env_var=None, endpoint_args=endpoint_args)
-    assert isinstance(client, expected_cls)
+def test_init_client_returns_expected_backend_class_or_raises(backend, endpoint_args, expected):
+    if expected is ValueError:
+        with pytest.raises(ValueError):
+            LLMClient.init_client(backend, api_key_env_var=None, endpoint_args=endpoint_args)
+    else:
+        client = LLMClient.init_client(backend, api_key_env_var=None, endpoint_args=endpoint_args)
+        assert isinstance(client, expected)
 
 
-def test_init_client_raises_on_unknown_backend():
-    with pytest.raises(ValueError):
-        LLMClient.init_client("unknown", api_key_env_var=None, endpoint_args={})
-
-
-def test_init_client_uses_placeholder_api_key_when_env_var_not_set():
-    client = LLMClient.init_client("default", api_key_env_var=None, endpoint_args={})
-    assert client.api_key == "EMPTY"
-
-
-def test_init_client_reads_api_key_from_env_var(monkeypatch):
-    monkeypatch.setenv("STUB_API_KEY", "secret")
-    client = LLMClient.init_client("default", api_key_env_var="STUB_API_KEY", endpoint_args={})
-    assert client.api_key == "secret"
+@pytest.mark.parametrize(
+    "api_key_env_var, env_value, expected_api_key",
+    [
+        (None, None, "EMPTY"),
+        ("STUB_API_KEY", "secret", "secret"),
+    ],
+)
+def test_init_client_resolves_api_key_from_env_var_or_placeholder(
+    monkeypatch, api_key_env_var, env_value, expected_api_key
+):
+    if env_value is not None:
+        monkeypatch.setenv(api_key_env_var, env_value)
+    client = LLMClient.init_client("default", api_key_env_var=api_key_env_var, endpoint_args={})
+    assert client.api_key == expected_api_key
 
 
 def test_from_config_loads_real_yaml(tmp_path):
@@ -59,20 +64,17 @@ def _make_client_with_stub_backend(monkeypatch, pool_size: int = 2) -> LLMClient
     )
 
 
-def test_call_returns_one_completion_per_input_in_order(monkeypatch):
+def test_call_returns_completions_in_order_and_forwards_kwargs(monkeypatch):
     client = _make_client_with_stub_backend(monkeypatch)
     responses_by_content = {"a": SimpleNamespace(id="r1"), "b": SimpleNamespace(id="r2")}
     client.client.chat.completions.create = AsyncMock(
         side_effect=lambda model, messages, **kwargs: responses_by_content[messages[0]["content"]]
     )
-    result = client([[{"role": "user", "content": "a"}], [{"role": "user", "content": "b"}]])
+    result = client(
+        [[{"role": "user", "content": "a"}], [{"role": "user", "content": "b"}]],
+        tool_choice={"type": "function", "function": {"name": "f"}},
+    )
     assert result == [responses_by_content["a"], responses_by_content["b"]]
-
-
-def test_call_forwards_kwargs_to_completions_create(monkeypatch):
-    client = _make_client_with_stub_backend(monkeypatch)
-    client.client.chat.completions.create = AsyncMock(return_value=SimpleNamespace(id="r"))
-    client([[{"role": "user", "content": "a"}]], tool_choice={"type": "function", "function": {"name": "f"}})
     _, kwargs = client.client.chat.completions.create.call_args
     assert kwargs["tool_choice"] == {"type": "function", "function": {"name": "f"}}
     assert kwargs["model"] == "stub-model"
@@ -83,26 +85,26 @@ def test_extract_tool_arguments_parses_json_arguments():
     assert extract_tool_arguments(response) == {"name": "x"}
 
 
-def test_extract_tool_arguments_returns_empty_dict_when_no_choices():
-    response = SimpleNamespace(choices=[])
+@pytest.mark.parametrize(
+    "choices",
+    [
+        [],
+        [SimpleNamespace(message=SimpleNamespace(tool_calls=None))],
+        [SimpleNamespace(message=SimpleNamespace(tool_calls=[]))],
+    ],
+)
+def test_extract_tool_arguments_returns_empty_dict_when_no_tool_call(choices):
+    response = SimpleNamespace(choices=choices)
     assert extract_tool_arguments(response) == {}
 
 
-def test_extract_tool_arguments_returns_empty_dict_when_tool_calls_is_none():
-    response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=None))])
-    assert extract_tool_arguments(response) == {}
-
-
-def test_extract_tool_arguments_returns_empty_dict_when_tool_calls_is_empty():
-    response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[]))])
-    assert extract_tool_arguments(response) == {}
-
-
-def test_parse_tool_arguments_returns_validated_model():
-    response = make_tool_response("some_tool", {"name": "x"})
-    assert parse_tool_arguments(response, StubArgs) == StubArgs(name="x")
-
-
-def test_parse_tool_arguments_returns_none_on_validation_error():
-    response = make_tool_response("some_tool", {"wrong_field": "x"})
-    assert parse_tool_arguments(response, StubArgs) is None
+@pytest.mark.parametrize(
+    "tool_args, expected",
+    [
+        ({"name": "x"}, StubArgs(name="x")),
+        ({"wrong_field": "x"}, None),
+    ],
+)
+def test_parse_tool_arguments_returns_validated_model_or_none(tool_args, expected):
+    response = make_tool_response("some_tool", tool_args)
+    assert parse_tool_arguments(response, StubArgs) == expected

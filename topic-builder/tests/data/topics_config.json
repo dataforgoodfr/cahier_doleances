@@ -3,26 +3,31 @@
     {
       "name": "Water Cycle",
       "description": "The continuous movement of water through evaporation, condensation, and precipitation.",
+      "sources": ["tests/data/sample.md"],
       "parent": null
     },
     {
       "name": "Hydrological Cycle",
       "description": "The circulation of water within Earth's hydrosphere.",
+      "sources": ["tests/data/sample.md"],
       "parent": null
     },
     {
       "name": "Photosynthesis",
       "description": "The process by which plants convert sunlight and CO2 into glucose and oxygen.",
+      "sources": ["tests/data/sample.md"],
       "parent": null
     },
     {
       "name": "IA",
       "description": "Artificial Intelligence.",
+      "sources": ["tests/data/sample.md"],
       "parent": null
     },
     {
       "name": "Mathematics",
       "description": "The Mathematics.",
+      "sources": ["tests/data/sample.md"],
       "parent": null
     }
   ]

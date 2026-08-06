@@ -8,7 +8,7 @@ set -euo pipefail
 
 INPUT_CSV=${INPUT_CSV:-data/sample/dataset.csv}
 OUTPUT_DIR=${OUTPUT_DIR:-data/sample/analysis}
-LLM_CONFIG=${LLM_CONFIG:-conf/clients/azure.yaml}
+LLM_CONFIG=${LLM_CONFIG:-conf/clients/scaleway.yaml}
 CLUSTERING_CONFIG=${CLUSTERING_CONFIG:-conf/clustering/default.yaml}
 
 DATASET=$INPUT_CSV
@@ -18,7 +18,7 @@ DISCOVER_RESULT=$OUTPUT_DIR/taxonomy/taxonomy_0.json
 FACTORIZE_RESULT_1=$OUTPUT_DIR/taxonomy/taxonomy_1.json
 FACTORIZE_REPORT_1=$OUTPUT_DIR/taxonomy/report_1.json
 FACTORIZE_RESULT_2=$OUTPUT_DIR/taxonomy/taxonomy_2.json
-FACTORIZE_REPORT_2=$OUTPUT_DIR/taxonomy/report._2json
+FACTORIZE_REPORT_2=$OUTPUT_DIR/taxonomy/report_2.json
 
 STRUCTURE_RESULT_1=$OUTPUT_DIR/taxonomy/taxonomy_3.json
 STRUCTURE_REPORT_1=$OUTPUT_DIR/taxonomy/report_3.json
@@ -72,7 +72,6 @@ uv run topicbuilder label \
   --taxonomy-path "$STRUCTURE_RESULT_2" \
   --llm-config-path "$LLM_CONFIG" \
   --output-path "$INSTANCES" \
-  --chunk-max-words 500 \
-  --clustering-config-path "$CLUSTERING_CONFIG"
+  --chunk-max-words 500
 
 echo "Done. Results in $OUTPUT_DIR/"

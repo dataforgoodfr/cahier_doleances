@@ -7,6 +7,7 @@ from topicbuilder.core.client import LLMClient, extract_tool_arguments
 from topicbuilder.core.clustering import chunk_text
 from topicbuilder.core.io import read_dataset, read_taxonomy, read_text, write_json
 from topicbuilder.core.schemas import Taxonomy, Topic
+from topicbuilder.core.taxonomy import sanitize_taxonomy
 
 DISCOVER_TOPICS_TOOL: dict = {
     "type": "function",
@@ -80,9 +81,9 @@ def discover_topics(
     prompt = read_text(prompt_path)
 
     # load texts and chunk them
-    texts = read_dataset(dataset_path)
-    chunks = [chunk for doc in texts for chunk in chunk_text(doc.content, chunk_max_words)]
-    logger.info(f"{len(texts)} texts segmented into {len(chunks)} chunks to process")
+    documents = read_dataset(dataset_path)
+    chunks = [(doc.id, chunk) for doc in documents for chunk in chunk_text(doc.content, chunk_max_words)]
+    logger.info(f"{len(documents)} texts segmented into {len(chunks)} chunks to process")
 
     # discover new topics
     ref_taxonomy = read_taxonomy(taxonomy_path) if taxonomy_path else Taxonomy(topics=[])
@@ -95,24 +96,24 @@ def discover_topics(
     return
 
 
-def discover_leaf_topics(texts: list[str], taxonomy: Taxonomy, client: LLMClient, prompt: str) -> Taxonomy:
+def discover_leaf_topics(
+    chunks: list[tuple[str, str]], taxonomy: Taxonomy, client: LLMClient, prompt: str,
+) -> Taxonomy:
     """
-    Send all texts to the LLM concurrently, collect discovered topics, and return a deduplicated merged taxonomy.
+    Send all text chunks to the LLM concurrently, tag each discovered topic with the id of the
+    text it was found in, and return the merged taxonomy with name duplicates collapsed.
     """
-    inputs = [build_messages(text, taxonomy, prompt) for text in texts]
     responses = client(
-        inputs=inputs,
+        inputs=[build_messages(text, taxonomy, prompt) for _, text in chunks],
         tools=[DISCOVER_TOPICS_TOOL],
         tool_choice={"type": "function", "function": {"name": "record_new_topics"}},
     )
-    existing_names = {t.name for t in taxonomy.topics}
     new_topics = [
-        Topic(**t)
-        for response in responses
+        Topic(**(t | {"sources": [text_id]}))
+        for (text_id, _), response in zip(chunks, responses, strict=True)
         for t in extract_tool_arguments(response).get("topics", [])
-        if t["name"] not in existing_names and not existing_names.add(t["name"])
     ]
-    return Taxonomy(topics=taxonomy.topics + new_topics)
+    return sanitize_taxonomy(Taxonomy(topics=taxonomy.topics + new_topics))
 
 
 def build_messages(text: str, taxonomy: Taxonomy, prompt: str) -> list[dict]:

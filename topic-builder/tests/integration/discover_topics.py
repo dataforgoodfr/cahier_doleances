@@ -5,6 +5,7 @@ Run with:
     python -m tests.integration.discover_topics
 """
 
+import csv
 import json
 import tempfile
 from pathlib import Path
@@ -25,6 +26,14 @@ def _expected_new_topics() -> list[dict]:
     """
     args = json.loads(MOCK_DISCOVER_TOPICS_RESPONSE["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
     return args["topics"]
+
+
+def _dataset_ids() -> set[str]:
+    """
+    Return the set of text ids present in the dataset CSV used by this test.
+    """
+    with DATASET_PATH.open(encoding="utf-8") as f:
+        return {row["id"] for row in csv.DictReader(f)}
 
 
 def run() -> None:
@@ -76,6 +85,12 @@ def run() -> None:
         new_names = {t["name"] for t in expected_new}
         output_names = {t["name"] for t in output["topics"]}
         assert new_names <= output_names, f"New topics missing from output: {new_names - output_names}"
+
+        dataset_ids = _dataset_ids()
+        new_topics_by_name = {t["name"]: t for t in output["topics"] if t["name"] in new_names}
+        for name, topic in new_topics_by_name.items():
+            assert topic["sources"], f"Topic {name!r} has no source text ids"
+            assert set(topic["sources"]) <= dataset_ids, f"Topic {name!r} has unknown source ids: {topic['sources']}"
 
         print(f"OK — {len(output['topics'])} topic(s) in output ({len(expected_new)} new).")
 

@@ -77,7 +77,7 @@ def merge_name_duplicates(taxonomy: Taxonomy) -> Taxonomy:
     and level, the first occurrence wins, inheriting a parent from discarded duplicates when the
     survivor has none. Among topics with the same name but different levels, the highest-level
     entry wins. Children whose parent id referred to a discarded duplicate are remapped to the
-    surviving topic's id.
+    surviving topic's id. Source text ids of every topic sharing a name are unioned into the survivor.
     """
     by_key: dict[tuple[str, int], Topic] = {}
     for t in taxonomy.topics:
@@ -94,15 +94,30 @@ def merge_name_duplicates(taxonomy: Taxonomy) -> Taxonomy:
 
     id_remap = {t.id: by_key[(t.name, highest_level[t.name])].id for t in taxonomy.topics}
 
+    merged: dict[str, dict[str, None]] = {}
+    for t in taxonomy.topics:
+        merged.setdefault(t.name, {}).update(dict.fromkeys(t.sources))
+    sources_by_name = {name: list(ids) for name, ids in merged.items()}
+
     seen: set[str] = set()
     topics = [
         (survivor := by_key[(t.name, highest_level[t.name])]).model_copy(
-            update={"parent": id_remap.get(survivor.parent, survivor.parent)}
+            update={
+                "parent": id_remap.get(survivor.parent, survivor.parent),
+                "sources": sources_by_name[t.name],
+            }
         )
         for t in taxonomy.topics
         if t.name not in seen and not seen.add(t.name)
     ]
     return Taxonomy(topics=topics)
+
+
+def filter_taxonomy_by_source(taxonomy: Taxonomy, source_id: str) -> Taxonomy:
+    """
+    Keep only the topics recording `source_id` among the texts they were discovered in.
+    """
+    return Taxonomy(topics=[t for t in taxonomy.topics if source_id in t.sources])
 
 
 def drop_blank_names(taxonomy: Taxonomy) -> Taxonomy:

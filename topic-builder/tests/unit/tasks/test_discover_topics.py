@@ -7,84 +7,52 @@ from topicbuilder.tasks.discover_topics import build_messages, discover_leaf_top
 STUB_PROMPT = "stub discover_topics prompt"
 
 
-def test_discover_topics_messages_returns_two_messages(taxonomy):
+def test_build_messages_returns_expected_messages(taxonomy):
     msgs = build_messages("some text", taxonomy, STUB_PROMPT)
-    assert len(msgs) == 2
+    topics_block = "\n".join(f"{i + 1}. {t.name}: {t.description}" for i, t in enumerate(taxonomy.topics))
+    assert msgs == [
+        {"role": "system", "content": STUB_PROMPT},
+        {"role": "user", "content": f"## Existing topics\n\n{topics_block}\n\n## Text\n\nsome text"},
+    ]
 
 
-def test_discover_topics_messages_system_role_carries_prompt(taxonomy):
-    msgs = build_messages("some text", taxonomy, STUB_PROMPT)
-    assert msgs[0]["role"] == "system"
-    assert msgs[0]["content"] == STUB_PROMPT
-
-
-def test_discover_topics_messages_user_content_includes_text(taxonomy):
-    msgs = build_messages("some text", taxonomy, STUB_PROMPT)
-    assert "some text" in msgs[1]["content"]
-
-
-def test_discover_topics_messages_user_content_includes_all_topic_names(taxonomy):
-    msgs = build_messages("some text", taxonomy, STUB_PROMPT)
-    for t in taxonomy.topics:
-        assert t.name in msgs[1]["content"]
-
-
-def test_discover_topics_messages_topics_are_numbered(taxonomy):
-    msgs = build_messages("some text", taxonomy, STUB_PROMPT)
-    for i in range(len(taxonomy.topics)):
-        assert f"{i + 1}." in msgs[1]["content"]
-
-
-def test_discover_topics_topics_returns_merged_config(taxonomy):
+def test_discover_leaf_topics_adds_new_topic_with_source_and_level(taxonomy):
     new_topic = Topic(name="Soil Composition", description="Mineral and organic components of soil.")
-    mock_response = make_discover_topics_response([new_topic])
-    mock_client = MagicMock(return_value=[mock_response])
-    result = discover_leaf_topics(["text"], taxonomy, mock_client, STUB_PROMPT)
+    mock_client = MagicMock(return_value=[make_discover_topics_response([new_topic])])
+    result = discover_leaf_topics([("doc1", "text")], taxonomy, mock_client, STUB_PROMPT)
     assert len(result.topics) == len(taxonomy.topics) + 1
-    assert result.topics[-1].name == "Soil Composition"
+    added = result.topics[-1]
+    assert added.name == "Soil Composition"
+    assert added.level == 0
+    assert added.sources == ["doc1"]
 
 
-def test_discover_topics_topics_no_new_topics_returns_original(taxonomy):
+def test_discover_leaf_topics_no_new_topics_returns_original_and_forces_tool_choice(taxonomy):
     mock_response = make_discover_topics_response([])
     mock_client = MagicMock(return_value=[mock_response])
-    result = discover_leaf_topics(["text"], taxonomy, mock_client, STUB_PROMPT)
+    result = discover_leaf_topics([("doc1", "text")], taxonomy, mock_client, STUB_PROMPT)
     assert result.topics == taxonomy.topics
-
-
-def test_discover_topics_topics_deduplicates_across_files(taxonomy):
-    new_topic = Topic(name="Soil Composition", description="Mineral and organic components of soil.")
-    mock_response = make_discover_topics_response([new_topic])
-    mock_client = MagicMock(return_value=[mock_response, mock_response])
-    result = discover_leaf_topics(["text1", "text2"], taxonomy, mock_client, STUB_PROMPT)
-    assert sum(1 for t in result.topics if t.name == "Soil Composition") == 1
-
-
-def test_discover_topics_topics_merges_topics_from_multiple_files(taxonomy):
-    topic_a = Topic(name="Soil Composition", description="Mineral and organic components of soil.")
-    topic_b = Topic(name="Erosion", description="Wearing away of soil by wind and water.")
-    mock_client = MagicMock(
-        return_value=[make_discover_topics_response([topic_a]), make_discover_topics_response([topic_b])]
-    )
-    result = discover_leaf_topics(["text1", "text2"], taxonomy, mock_client, STUB_PROMPT)
-    names = [t.name for t in result.topics]
-    assert "Soil Composition" in names
-    assert "Erosion" in names
-
-
-def test_discover_topics_topics_forces_record_new_topics_tool(taxonomy):
-    mock_response = make_discover_topics_response([])
-    mock_client = MagicMock(return_value=[mock_response])
-    discover_leaf_topics(["text"], taxonomy, mock_client, STUB_PROMPT)
-    call_kwargs = mock_client.call_args.kwargs
-    assert call_kwargs["tool_choice"] == {
+    assert mock_client.call_args.kwargs["tool_choice"] == {
         "type": "function",
         "function": {"name": "record_new_topics"},
     }
 
 
-def test_discover_topics_topics_new_topics_have_level_zero(taxonomy):
+def test_discover_leaf_topics_dedupes_same_topic_across_files_and_unions_sources(taxonomy):
     new_topic = Topic(name="Soil Composition", description="Mineral and organic components of soil.")
-    mock_client = MagicMock(return_value=[make_discover_topics_response([new_topic])])
-    result = discover_leaf_topics(["text"], taxonomy, mock_client, STUB_PROMPT)
-    new_topics = [t for t in result.topics if t.name == "Soil Composition"]
-    assert new_topics[0].level == 0
+    mock_response = make_discover_topics_response([new_topic])
+    mock_client = MagicMock(return_value=[mock_response, mock_response])
+    result = discover_leaf_topics([("doc1", "text1"), ("doc2", "text2")], taxonomy, mock_client, STUB_PROMPT)
+    merged = [t for t in result.topics if t.name == "Soil Composition"]
+    assert len(merged) == 1
+    assert merged[0].sources == ["doc1", "doc2"]
+
+
+def test_discover_leaf_topics_rediscovered_topic_keeps_id_and_gains_source(taxonomy):
+    existing = taxonomy.topics[0]
+    same_topic = Topic(name=existing.name, description=existing.description)
+    mock_client = MagicMock(return_value=[make_discover_topics_response([same_topic])])
+    result = discover_leaf_topics([("doc1", "text")], taxonomy, mock_client, STUB_PROMPT)
+    rediscovered = next(t for t in result.topics if t.name == existing.name)
+    assert rediscovered.id == existing.id
+    assert rediscovered.sources == ["doc1"]

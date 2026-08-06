@@ -117,6 +117,7 @@ Identify new topics across a dataset CSV, and append them to an existing topics 
 Notes:
 
 - All documents are processed concurrently.
+- Each topic records the id of the text it was discovered in, under `sources`.
 - The topics config is appended to each LLM call, which can quickly consume the full window context if the config is large.
 
 <details>
@@ -170,6 +171,7 @@ uv run topicbuilder discover-topics \
       "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "name": "Short topic label",
       "description": "Concise, text-agnostic definition of the concept.",
+      "sources": ["docs/intro.md"],
       "parent": null,
       "level": 0,
       "validated": false
@@ -249,6 +251,7 @@ uv run topicbuilder discover-parents \
       "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "name": "Child topic",
       "description": "Leaf concept definition.",
+      "sources": ["docs/intro.md"],
       "parent": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
       "level": 0,
       "validated": false
@@ -257,6 +260,7 @@ uv run topicbuilder discover-parents \
       "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
       "name": "Parent meta-topic name",
       "description": "Broader concept grouping related children.",
+      "sources": [],
       "parent": null,
       "level": 1,
       "validated": false
@@ -281,7 +285,7 @@ Notes:
 
 - Topics with different levels cannot be merged together, only topics belonging to the same level can.
 - Topics with `"validated": true` cannot be merged and won't disappear.
-- When topics are merged into a target topic, its children and parent are redirected to the surviving target.
+- When topics are merged into a target topic, its children and parent are redirected to the surviving target, and the `sources` of every merged topic are unioned into it.
 
 <details>
 <summary>Flow</summary>
@@ -334,11 +338,12 @@ uv run topicbuilder factorize \
 
 Label each document in a dataset CSV using a topics config. The prompt describing the task is located at `conf/prompts/label.md` and is formated to generate outputs through function calling.
 
-All documents are processed concurrently and results are keyed by document id. Texts are chunked by word count, and the level-0 taxonomy is grouped via semantic clustering, so that labelling scales.
+All documents are processed concurrently and results are keyed by document id. Texts are chunked by word count; each document is only offered the topics that record its id under `sources`.
 
 Notes:
 
-- Only level-0 topics are used for the labelling.
+- A document that is not recorded as the source of any topic gets an empty label list, and no LLM call is made for it.
+- Only leaf topics are used for labelling.
 
 <details>
 <summary>Flow</summary>
@@ -348,8 +353,8 @@ flowchart TD
     A([label]) --> B[Read dataset CSV]
     B --> C[Split texts into chunks of at most\nchunk-max-words words]
     A --> D[Read topics config]
-    D --> E[Cluster level-0 topics\nvia embedding + UMAP + HDBSCAN]
-    C --> F[Send all pairs text_chunk, taxonomy_cluster\nto LLM concurrently]
+    D --> E[Restrict topics per document\nto those listing its id in sources]
+    C --> F[Send all pairs text_chunk, document_topics\nto LLM concurrently]
     E --> F
     F --> G([Write per-document\nlabeled topics JSON])
 ```
@@ -371,7 +376,6 @@ uv run topicbuilder label [OPTIONS]
 | `--output-path PATH` | Path where the labeled topics JSON will be written |
 | `--prompt-path PATH` | *(optional)* Path to the system prompt file *(default: `conf/prompts/label.md`)* |
 | `--chunk-max-words INT` | *(optional)* Max words per text chunk *(default: 500)* |
-| `--clustering-config-path PATH` | *(optional)* Path to the clustering config YAML controlling the semantic pre-clustering of level-0 topics *(default: `conf/clustering/default.yaml`)* |
 
 **Example:**
 

@@ -428,6 +428,52 @@ def test_merge_name_duplicates_no_duplicates_unchanged():
     assert [t.name for t in merge_name_duplicates(taxonomy).topics] == ["A", "B"]
 
 
+def test_merge_name_duplicates_unions_sources_across_duplicates():
+    taxonomy = Taxonomy(
+        topics=[
+            Topic(name="A", description="first", level=0, sources=["doc1"]),
+            Topic(name="A", description="second", level=0, sources=["doc2"]),
+        ]
+    )
+    result = merge_name_duplicates(taxonomy)
+    assert result.topics[0].sources == ["doc1", "doc2"]
+
+
+def test_merge_name_duplicates_dedupes_repeated_source_ids():
+    taxonomy = Taxonomy(
+        topics=[
+            Topic(name="A", description="first", level=0, sources=["doc1"]),
+            Topic(name="A", description="second", level=0, sources=["doc1", "doc2"]),
+        ]
+    )
+    result = merge_name_duplicates(taxonomy)
+    assert result.topics[0].sources == ["doc1", "doc2"]
+
+
+def test_merge_name_duplicates_cross_level_unions_sources_onto_survivor():
+    taxonomy = Taxonomy(
+        topics=[
+            Topic(name="A", description="low", level=0, sources=["doc1"]),
+            Topic(name="A", description="high", level=1, sources=["doc2"]),
+        ]
+    )
+    result = merge_name_duplicates(taxonomy)
+    assert result.topics[0].level == 1
+    assert result.topics[0].sources == ["doc1", "doc2"]
+
+
+def test_merge_name_duplicates_no_duplicates_keeps_own_sources():
+    taxonomy = Taxonomy(
+        topics=[
+            Topic(name="A", description="d", sources=["doc1"]),
+            Topic(name="B", description="d"),
+        ]
+    )
+    result = merge_name_duplicates(taxonomy)
+    assert result.topics[0].sources == ["doc1"]
+    assert result.topics[1].sources == []
+
+
 # --- drop_blank_names ---
 
 
