@@ -30,7 +30,7 @@ def test_extract_pages_persists_rows(engine, pdf_path):
 
         first = rows[0]
         assert first.pdf_name == pdf_path.name
-        assert first.city == "BOURG-EN-BRESSE"
+        assert first.city == "VILLE-TEST"
         assert first.page_number >= 3  # first two pages are metadata
 
 
@@ -41,7 +41,7 @@ def test_city_extracted_on_contribution(engine, pdf_path):
     with Session(engine) as session:
         contribution = session.get(Contribution, contribution_id)
         assert contribution is not None
-        assert contribution.city == "BOURG-EN-BRESSE"
+        assert contribution.city == "VILLE-TEST"
 
 
 def test_no_page_extraction_for_metadata_pages(engine, pdf_path):
@@ -75,20 +75,20 @@ def test_parsing_stops_at_end_marker(engine, pdf_path):
             .scalars()
             .all()
         )
-        # The marker is at page index 82 = page_number 83.
-        assert all(r.page_number < 83 for r in rows), (
+        # The marker is at page 7 (1-indexed) in the test PDF.
+        assert all(r.page_number < 7 for r in rows), (
             "A page beyond the end marker was persisted"
         )
-        assert rows[-1].page_number < 83
+        assert rows[-1].page_number < 7
 
 
 def test_needs_ocr_flag_on_handwritten_pages(engine, pdf_path):
     """needs_ocr flag reflects wordfreq quality: low-score pages are flagged.
 
-    In this test PDF, pages 39 and 40 (within the parsing range, before the
-    'Fin des pages écrites' marker) are OCR garbage from handwritten pages.
-    They must be flagged needs_ocr=True. Typed pages (high quality_score)
-    must be flagged False.
+    In this test PDF, page 5 (within the parsing range, before the
+    'Fin des pages écrites' marker) is OCR garbage emulating a handwritten
+    page. It must be flagged needs_ocr=True. Typed pages (high
+    quality_score) must be flagged False.
 
     NB: pages located AFTER the end marker are not persisted (out of scope).
     """
@@ -109,7 +109,7 @@ def test_needs_ocr_flag_on_handwritten_pages(engine, pdf_path):
         threshold = ExtractionConfig.WORDFREQ_QUALITY_THRESHOLD.value
         by_page = {r.page_number: r for r in rows}
 
-        known_handwritten = {39, 40}
+        known_handwritten = {5}
         for page_number in known_handwritten:
             assert page_number in by_page, f"Page {page_number} missing"
             r = by_page[page_number]
@@ -170,8 +170,8 @@ def test_short_pages_filtered(engine, pdf_path):
 @pytest.mark.parametrize(
     "phrase",
     [
-        "Je suis une habitante du revennont",
-        "Vous trouverez joint à ce courrier le cahier d'expression citoyenne",
+        "Je suis une habitante de la commune",
+        "Notre commune doit renforcer ses politiques",
     ],
 )
 def test_extracted_text_contains_phrase(engine, pdf_path, phrase):
