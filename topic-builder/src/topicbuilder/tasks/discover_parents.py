@@ -4,7 +4,11 @@ import typer
 from pydantic import BaseModel
 
 from topicbuilder.core.client import LLMClient, parse_tool_arguments
-from topicbuilder.core.clustering import clusterize_taxonomy_by_level, most_similar_topic
+from topicbuilder.core.clustering import (
+    ClusteringConfig,
+    clusterize_taxonomy_by_level,
+    most_similar_topic,
+)
 from topicbuilder.core.io import read_taxonomy, read_text, write_json
 from topicbuilder.core.schemas import ParentAddition, ParentCandidate, ParentDiscoveryReport, Taxonomy, Topic
 from topicbuilder.core.taxonomy import check_taxonomy, display_duplicates, format_violations, sanitize_taxonomy
@@ -86,6 +90,12 @@ def discover_parents(
         exists=True,
         help="Directory containing the structure prompt files.",
     ),
+    clustering_config_path: Path = typer.Option(
+        Path("conf/clustering/default.yaml"),
+        "--clustering-config-path",
+        exists=True,
+        help="Path to the clustering config YAML.",
+    ),
     output_path: Path = typer.Option(
         ...,
         "--output-path",
@@ -95,11 +105,6 @@ def discover_parents(
         ...,
         "--report-path",
         help="Path where the change report JSON will be written.",
-    ),
-    chunk_size: int = typer.Option(
-        500,
-        "--chunk-size",
-        help="Maximum number of parentless topics per parent-generation chunk.",
     ),
 ) -> None:
     """
@@ -111,13 +116,19 @@ def discover_parents(
     client = LLMClient.from_config(llm_config_path)
     parent_generation_prompt = read_text(prompts_dir / "parent_generation.md")
     parent_validation_prompt = read_text(prompts_dir / "parent_validation.md")
+    clustering_config = ClusteringConfig.from_config(clustering_config_path)
 
     # ensure taxonomy is healthy
     taxonomy = sanitize_taxonomy(taxonomy)
 
     # run parent grouping process
     parentless = Taxonomy(topics=[t for t in taxonomy.topics if t.parent is None])
-    candidates = generate_parent_candidates(parentless, client, parent_generation_prompt, chunk_size)
+    candidates = generate_parent_candidates(
+        taxonomy=parentless,
+        client=client,
+        prompt=parent_generation_prompt,
+        clustering_config=clustering_config,
+    )
     additions = validate_parent_candidates(candidates, client, parent_validation_prompt)
     taxonomy = insert_parents(taxonomy, additions)
 
@@ -140,10 +151,10 @@ def generate_parent_candidates(
     taxonomy: Taxonomy,
     client: LLMClient,
     prompt: str,
-    chunk_size: int,
+    clustering_config: ClusteringConfig,
 ) -> list[ParentCandidate]:
     """
-    Partition the taxonomy into chunks of at most `chunk_size` topics, ask the model to propose
+    Partition the taxonomy into clusters, ask the model to propose
     parent candidates per chunk, then dedupe so each child name appears in at most one candidate.
     """
     if not taxonomy.topics:
@@ -152,7 +163,7 @@ def generate_parent_candidates(
     # check for duplicate topic names
     display_duplicates(taxonomy)
 
-    chunks = clusterize_taxonomy_by_level(taxonomy, chunk_size)
+    chunks = clusterize_taxonomy_by_level(taxonomy, clustering_config)
     responses = client(
         inputs=[build_parent_generation_messages(ct, prompt) for ct in chunks],
         tools=[PARENT_GENERATION_TOOL],
