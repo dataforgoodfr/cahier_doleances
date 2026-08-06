@@ -12,7 +12,7 @@ from cahier_doleances.extraction.extraction_config import (
     city_regex,
 )
 from cahier_doleances.extraction.persist import save_page_extractions
-from cahier_doleances.extraction.settings import logger
+from cahier_doleances.settings import logger
 from cahier_doleances.utils.timing import timed
 
 

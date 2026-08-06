@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from cahier_doleances.database.db import get_engine
 from cahier_doleances.database.models import Contribution, PageExtraction
-from cahier_doleances.extraction.settings import logger
+from cahier_doleances.settings import logger
 
 
 def save_page_extractions(

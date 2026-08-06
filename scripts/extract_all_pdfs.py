@@ -14,8 +14,9 @@ from cahier_doleances.database.db import get_engine
 from cahier_doleances.database.models import Contribution, PageExtraction
 from cahier_doleances.extraction.discovery import list_pdfs, require_path_to_data
 from cahier_doleances.extraction.extract_text import extract_pdf_pages
+from cahier_doleances.settings import logger
 from cahier_doleances.utils.timing import timed
-from cahier_doleances.config import logger
+
 
 @timed
 def main() -> int:
@@ -27,7 +28,7 @@ def main() -> int:
     data_dir = require_path_to_data()
     pdf_paths = list_pdfs(data_dir)
 
-    print(f"Found {len(pdf_paths)} PDF(s) in {data_dir.resolve()}")
+    logger.info(f"Found {len(pdf_paths)} PDF(s) in {data_dir.resolve()}")
 
     engine = get_engine()
     failed: list[str] = []
@@ -35,13 +36,13 @@ def main() -> int:
 
     with Session(engine) as session:
         for pdf_path in tqdm(pdf_paths, desc="Extracting PDFs"):
-            print(f"\nSelected PDF: {pdf_path.name}")
-            print(f"Full path: {pdf_path.resolve()}")
+            logger.info(f"\nSelected PDF: {pdf_path.name}")
+            logger.info(f"Full path: {pdf_path.resolve()}")
 
             try:
                 contribution_id = extract_pdf_pages(pdf_path)
             except Exception as exc:  # noqa: BLE001 - catch any per-PDF failure to keep the batch running
-                print(
+                logger.info(
                     f"Failed to extract {pdf_path.name}: {exc}",
                     file=sys.stderr,
                 )
@@ -50,7 +51,7 @@ def main() -> int:
 
             contribution = session.get(Contribution, contribution_id)
             if contribution is None:
-                print(
+                logger.info(
                     f"Contribution id={contribution_id} not found in DB",
                     file=sys.stderr,
                 )
@@ -66,21 +67,21 @@ def main() -> int:
                 or 0
             )
 
-            print("--- Contribution ---")
-            print(f"  id: {contribution.id}")
-            print(f"  pdf_file: {contribution.pdf_file}")
-            print(f"  city: {contribution.city or '(not set)'}")
-            print(f"  pages: {contribution.start_page}-{contribution.end_page}")
-            print(f"  page_extraction_rows: {page_count}")
-            print(f"  is_handwritten: {contribution.is_handwritten}")
+            logger.info("--- Contribution ---")
+            logger.info(f"  id: {contribution.id}")
+            logger.info(f"  pdf_file: {contribution.pdf_file}")
+            logger.info(f"  city: {contribution.city or '(not set)'}")
+            logger.info(f"  pages: {contribution.start_page}-{contribution.end_page}")
+            logger.info(f"  page_extraction_rows: {page_count}")
+            logger.info(f"  is_handwritten: {contribution.is_handwritten}")
 
             succeeded.append(contribution_id)
 
-    print("\n=== Summary ===")
-    print(f"  processed: {len(succeeded)}")
-    print(f"  failed: {len(failed)}")
+    logger.info("\n=== Summary ===")
+    logger.info(f"  processed: {len(succeeded)}")
+    logger.info(f"  failed: {len(failed)}")
     if failed:
-        print(f"  failed files: {', '.join(failed)}")
+        logger.info(f"  failed files: {', '.join(failed)}")
 
     return 0 if not failed else 1
 
