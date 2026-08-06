@@ -164,6 +164,9 @@ cython_debug/
 .ruff_cache
 
 # Données des cahiers (sous NDA) + dataset dérivé : jamais committées
-data/
+/data
 .DS_Store
 backups/
+
+# PyCharm
+*.idea

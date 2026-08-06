@@ -1,0 +1,102 @@
+# --- PROJECT ---
+
+[project]
+name = "topic-builder"
+version = "1.0.0"
+description = "Topic modeling tool: reads a text file and extracts topics with summaries and extracts"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+
+# --- DEPENDENCIES ---
+
+dependencies = [
+    "backoff>=2.2.1",
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "openai>=1.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.2.2",
+    "typer>=0.12",
+    "networkx>=3.6.1",
+    "dash>=4.3.0",
+    "dash-cytoscape>=1.0.2",
+    "dash-bootstrap-components>=1.6.0",
+    "pandas>=3.0.3",
+    "loguru>=0.7.3",
+    "fastembed>=0.4",
+    "scikit-learn>=1.3",
+    "numba>=0.59",
+    "umap-learn>=0.5.6",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "pre-commit>=4.6.0",
+    "pyrefly>=1.0.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.17",
+]
+
+# --- CLI ---
+
+[project.scripts]
+topicbuilder = "topicbuilder.__main__:app"
+
+# --- CODE-QA ---
+
+[tool.coverage.run]
+source = ['topicbuilder']
+data_file = "data/logs/.coverage"
+
+[tool.coverage.xml]
+output = "data/logs/coverage.xml"
+
+[tool.mypy]
+exclude = '^(?!src).*'
+disable_error_code = """
+    call-overload,
+    import-untyped,
+    literal-required,
+    override,
+    typeddict-item,
+    union-attr,
+    var-annotated
+"""
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+addopts = """
+  -ra \
+  --junitxml data/logs/tests.xml \
+  --cov src \
+  --cov-report xml \
+  --cov-report term-missing
+"""
+log_file = "data/logs/tests.log"
+log_file_level = "INFO"
+log_file_format = "%(asctime)s [%(filename)s:%(lineno)-4d] [%(levelname)-8s] %(message)s"
+log_file_date_format = "%Y-%m-%d %H:%M:%S"
+
+[tool.ruff]
+exclude = ["configs/", "data/", "models/", "notebooks/", "packages/", "scripts/"]
+fix = true
+line-length = 119
+
+[tool.ruff.lint]
+select = ["C", "E", "F", "I", "W", "N", "B"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+# --- BUILD ---
+
+[build-system]
+requires = ["uv_build<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "topicbuilder"

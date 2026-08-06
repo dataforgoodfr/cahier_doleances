@@ -1,6 +1,6 @@
 # Cahiers de doléances
 
-Projet Data For Good : outil de visualisation et d'annotation des cahiers de doléances.
+Projet Data For Good : Outil de découverte, visualisation et annotation des thèmes abordés dans des cahiers de doléances.
 Les contributions extraites des PDF sont stockées en base PostgreSQL ; une app Gradio permet
 de les parcourir commune par commune et de les annoter (anonymisé, contribution d'intérêt).
 
@@ -10,6 +10,7 @@ de les parcourir commune par commune et de les annoter (anonymisé, contribution
 - `cahier_doleances/extraction/` : le pipeline d'extraction de texte depuis les PDFs
 - `gradio_app/` : l'interface pour parcourir les contributions et les annoter | [documentation](gradio_app/README.md)
 - `scripts/` : scripts utilitaires (extraction par lot)
+- `topic-builder/` : l'utilitaire de découverte, structuration et annotation des thèmes abordés dans les contributions | [documentation](topic-builder/README.md)
 
 ## Installation
 
