@@ -6,8 +6,10 @@ de les parcourir commune par commune et de les annoter (anonymisé, contribution
 
 ## Organisation
 
-- `database/` : le modèle de données et les migrations qui structurent la base PostgreSQL | [documentation](database/README.md)
+- `cahier_doleances/database/` : le modèle de données et les migrations qui structurent la base PostgreSQL | [documentation](cahier_doleances/database/README.md)
+- `cahier_doleances/extraction/` : le pipeline d'extraction de texte depuis les PDFs
 - `gradio_app/` : l'interface pour parcourir les contributions et les annoter | [documentation](gradio_app/README.md)
+- `scripts/` : scripts utilitaires (extraction par lot)
 
 ## Installation
 
@@ -28,15 +30,19 @@ source .venv/bin/activate
 Ou préfixez vos commandes par `uv run` :
 
 ```bash
-uv run python -m database.seed_mock # remplit la base avec le seed de démo
+uv run python -m cahier_doleances.database.seed_mock # remplit la base avec le seed de démo
 uv run python gradio_app/app.py # lance l'app
 ```
 
 ## Base de données
 
 La connexion PostgreSQL est lue depuis `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`,
-`DB_PASSWORD`, `DB_NAME`). Voir [database/README.md](database/README.md) pour le modèle,
+`DB_PASSWORD`, `DB_NAME`). Voir [cahier_doleances/database/README.md](cahier_doleances/database/README.md) pour le modèle,
 les migrations Alembic et le seed.
+
+## Extraction des PDFs
+
+Les PDFs des cahiers de doléances sont traités par le module `cahier_doleances/extraction/`. Le texte natif est extrait page par page, stocké dans la table `page_extraction`, et un score de qualité permet de détecter les pages manuscrites. Le détail du pipeline et les commandes sont dans [cahier_doleances/database/README.md](cahier_doleances/database/README.md#extraction-des-pdfs).
 
 ## Qualité et sécurité du code (pre-commit)
 
