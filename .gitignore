@@ -170,3 +170,4 @@ backups/
 
 # PyCharm
 *.idea
+scripts/generate_test_pdf.py
