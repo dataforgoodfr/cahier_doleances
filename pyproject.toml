@@ -16,6 +16,7 @@ dependencies = [
     "jupysql>=0.10.17",
     "matplotlib>=3.10.0",
     "pandas>=2.2.3",
+    "pdfplumber>=0.11.4",
     "psycopg2-binary>=2.9.12",
     "python-dotenv>=1.1.0",
     "requests>=2.32.3",

@@ -8,6 +8,7 @@ de les parcourir commune par commune et de les annoter (anonymisé, contribution
 
 - `database/` : le modèle de données et les migrations qui structurent la base PostgreSQL | [documentation](database/README.md)
 - `gradio_app/` : l'interface pour parcourir les contributions et les annoter | [documentation](gradio_app/README.md)
+- `ocr/` : les scripts d'extraction des contributions depuis les PDF, un sous-répertoire par source | [édition Chabin](ocr/chabin/README.md)
 - `topic-builder/` : l'utilitaire de découverte, structuration et annotation des thèmes abordés dans les contributions | [documentation](topic-builder/README.md)
 
 ## Installation
