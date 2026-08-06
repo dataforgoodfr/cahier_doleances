@@ -6,6 +6,7 @@ __pycache__/
 *.db
 # C extensions
 *.so
+Agent.md
 
 # Distribution / packaging
 bin/
