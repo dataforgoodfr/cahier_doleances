@@ -1,0 +1,6 @@
+backend: default
+model: Qwen/Qwen3-0.6B
+pool_size: 4
+api_key_env_var:
+endpoint_args:
+  base_url: http://localhost:8000/v1

@@ -1,0 +1,19 @@
+services:
+  vllm:
+    extends:
+      file: docker-compose.base.yml
+      service: vllm
+    container_name: qwen3-0.6b
+    image: vllm/vllm-openai:v0.25.1
+    command:
+      - --host=0.0.0.0
+      - --port=8000
+      - --gpu-memory-utilization=0.7
+      - --model=Qwen/Qwen3-0.6B
+      - --language-model-only
+      - --enable-auto-tool-choice
+      - --tool-call-parser=hermes
+      - --reasoning-parser=qwen3
+      - --enable-prefix-caching
+      - --max-model-len=16384
+      - --speculative-config={"method":"suffix","num_speculative_tokens":3}

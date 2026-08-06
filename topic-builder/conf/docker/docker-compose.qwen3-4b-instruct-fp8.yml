@@ -1,0 +1,25 @@
+services:
+  vllm:
+    extends:
+      file: docker-compose.base.yml
+      service: vllm
+    container_name: qwen3.5-4b-instruct-fp8
+    image: vllm/vllm-openai:v0.25.1
+    environment:
+      VLLM_WSL2_ENABLE_PIN_MEMORY: "1"
+      VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS: "0"
+    command:
+      - --host=0.0.0.0
+      - --port=8000
+      - --gpu-memory-utilization=0.86
+      - --optimization-level=3
+      - --max-cudagraph-capture-size=4
+      - --model=Qwen/Qwen3-4B-Instruct-2507-FP8
+      - --language-model-only
+      - --enable-auto-tool-choice
+      - --tool-call-parser=qwen3_coder
+      - --reasoning-parser=qwen3
+      - --enable-prefix-caching
+      - --max-model-len=8192
+      - --max-logprobs=1
+      - --max-num-seqs=24
