@@ -30,7 +30,7 @@ uv sync
 
 ### LLM server setup
 
-This project necessitates a LLM server with openai-compatible API.
+This project necessitates a LLM server with an openai-compatible API.
 If necessary, you can set up a local `vllm` server with Docker Compose, see [`conf/docker/README.md`](conf/docker/README.md).
 
 [Back to top](#topic-builder)
@@ -184,10 +184,10 @@ uv run topicbuilder discover-topics \
 
 Group parentless topics under new parent meta-topics. The prompts describing the task are located at `conf/prompts/discover_parents`: one for generating cadidates of grouped topics, and another to clean each candidate group by creating a parent topic for the group. Prompts are formated to generate outputs through function calling.
 
-The structuring pipeline runs per level. Within each level, parentless topics are chunked and processed in two LLM steps per chunk:
+The structuring pipeline runs per level. Within each level, parentless topics are grouped and processed in two LLM steps per group:
 
-1. **Topic pre-clustering** — topics are chunked into clusters of topics using some heuristic.
-2. **Candidate generation** — given a chunk of topic names only, the model proposes parent names with candidate children.
+1. **Topic pre-clustering** — topic names are embedded, reduced with UMAP, and grouped with HDBSCAN into semantically coherent clusters (config at `--clustering-config-path`); ungrouped topics become singleton clusters.
+2. **Candidate generation** — given a cluster of topic names only, the model proposes parent names with candidate children.
 3. **Parent validation** — given the full name and description of each candidate group, the model confirms the parent name, writes a description, and selects the final subset of children.
 
 New parent topics are created at `level = children_level + 1`.
@@ -204,8 +204,8 @@ Notes:
 flowchart TD
     A([structure]) --> B[Read taxonomy]
     B --> C[Sanityze Taxonomy]
-    C --> D[Partition Taxonomy into chunks\nof at most chunk-size topics]
-    D --> E[Propose parent candidates\nper chunk]
+    C --> D[Cluster parentless topics per level\nvia embedding + UMAP + HDBSCAN]
+    D --> E[Propose parent candidates\nper cluster]
     E --> F[Validate parents\nper candidate group]
     F --> G[Insert parents]
     G --> H([Write structured taxonomy])
@@ -228,7 +228,7 @@ uv run topicbuilder discover-parents [OPTIONS]
 | `--output-path PATH` | Path where the structured taxonomy JSON will be written |
 | `--report-path PATH` | Path where the change report JSON will be written |
 | `--prompts-dir PATH` | *(optional)* Directory containing the structure prompt files *(default: `conf/prompts/discover_parents`)* |
-| `--chunk-size INT` | *(optional)* Max parentless topics per parent-generation chunk *(default: 500)* |
+| `--clustering-config-path PATH` | *(optional)* Path to the clustering config YAML controlling the semantic pre-clustering step *(default: `conf/clustering/default.yaml`)* |
 
 **Example:**
 
@@ -237,8 +237,7 @@ uv run topicbuilder discover-parents \
   --taxonomy-path data/sample/analysis/taxonomy_factorized.json \
   --llm-config-path conf/clients/vllm-qwen3-4b-it-fp8.yaml \
   --output-path data/sample/analysis/taxonomy_structured.json \
-  --report-path data/sample/analysis/report_structuration.json \
-  --chunk-size 500
+  --report-path data/sample/analysis/report_structuration.json
 ```
 
 **Output — structured taxonomy JSON** (`--output-path`):
@@ -274,8 +273,8 @@ Merge near-duplicate topics of identical level into an existing target topic of 
 
 The merge pipeline consists in 3 steps:
 
-1. **Topic pre-clustering** — topics are chunked into clusters of topics using some heuristic.
-2. **Candidate generation** — given a chunk and its list of topic names, the model proposes sub-groups of potentially duplicate names.
+1. **Topic pre-clustering** — topic names are embedded, reduced with UMAP, and grouped with HDBSCAN into semantically coherent clusters (config at `--clustering-config-path`); ungrouped topics become singleton clusters.
+2. **Candidate generation** — given a cluster and its list of topic names, the model proposes sub-groups of potentially duplicate names.
 3. **Merge validation** — given the full name and description of each candidate group, the model decides the actual merge operations.
 
 Notes:
@@ -291,8 +290,8 @@ Notes:
 flowchart TD
     A([factorize]) --> B[Read taxonomy]
     B --> C[Sanityze Taxonomy]
-    C --> D[Partition Taxonomy into chunks\nof at most chunk-size topics]
-    D --> E[Propose merge candidates\nper chunk]
+    C --> D[Cluster topics per level\nvia embedding + UMAP + HDBSCAN]
+    D --> E[Propose merge candidates\nper cluster]
     E --> F[Validate merges\nper candidate group]
     F --> G[Apply merges\nredirect children and parents]
     G --> H([Write cleaned taxonomy])
@@ -315,7 +314,7 @@ uv run topicbuilder factorize [OPTIONS]
 | `--output-path PATH` | Path where the cleaned taxonomy JSON will be written |
 | `--report-path PATH` | Path where the change report JSON will be written |
 | `--prompts-dir PATH` | *(optional)* Directory containing the factorize prompt files *(default: `conf/prompts/factorize`)* |
-| `--chunk-size INT` | *(optional)* Max topics per merge-generation chunk *(default: 500)* |
+| `--clustering-config-path PATH` | *(optional)* Path to the clustering config YAML controlling the semantic pre-clustering step *(default: `conf/clustering/default.yaml`)* |
 
 **Example:**
 
@@ -324,8 +323,7 @@ uv run topicbuilder factorize \
   --taxonomy-path data/sample/analysis/taxonomy.json \
   --llm-config-path conf/clients/vllm-qwen3-4b-it-fp8.yaml \
   --output-path data/sample/analysis/taxonomy_factorized.json \
-  --report-path data/sample/analysis/report_factorization.json \
-  --chunk-size 500
+  --report-path data/sample/analysis/report_factorization.json
 ```
 
 **Output — cleaned taxonomy JSON** (`--output-path`): same format as discover output.
@@ -336,7 +334,7 @@ uv run topicbuilder factorize \
 
 Label each document in a dataset CSV using a topics config. The prompt describing the task is located at `conf/prompts/label.md` and is formated to generate outputs through function calling.
 
-All documents are processed concurrently and results are keyed by document id. Both the texts and the taxonomy are chunked in order to make the labelling scallable.
+All documents are processed concurrently and results are keyed by document id. Texts are chunked by word count, and the level-0 taxonomy is grouped via semantic clustering, so that labelling scales.
 
 Notes:
 
@@ -350,8 +348,8 @@ flowchart TD
     A([label]) --> B[Read dataset CSV]
     B --> C[Split texts into chunks of at most\nchunk-max-words words]
     A --> D[Read topics config]
-    D --> E[Partition level-0 topics into chunks\nof at most chunk-size topics]
-    C --> F[Send all pairs text_chunk, taxonomy_chunk\nto LLM concurrently]
+    D --> E[Cluster level-0 topics\nvia embedding + UMAP + HDBSCAN]
+    C --> F[Send all pairs text_chunk, taxonomy_cluster\nto LLM concurrently]
     E --> F
     F --> G([Write per-document\nlabeled topics JSON])
 ```
@@ -373,7 +371,7 @@ uv run topicbuilder label [OPTIONS]
 | `--output-path PATH` | Path where the labeled topics JSON will be written |
 | `--prompt-path PATH` | *(optional)* Path to the system prompt file *(default: `conf/prompts/label.md`)* |
 | `--chunk-max-words INT` | *(optional)* Max words per text chunk *(default: 500)* |
-| `--taxonomy-chunk-size INT` | *(optional)* Max level-0 topics per taxonomy chunk *(default: 50)* |
+| `--clustering-config-path PATH` | *(optional)* Path to the clustering config YAML controlling the semantic pre-clustering of level-0 topics *(default: `conf/clustering/default.yaml`)* |
 
 **Example:**
 
@@ -383,8 +381,7 @@ uv run topicbuilder label \
   --taxonomy-path data/sample/analysis/taxonomy_structured.json \
   --llm-config-path conf/clients/vllm-qwen3-4b-it-fp8.yaml \
   --output-path data/sample/analysis/instances.json \
-  --chunk-max-words 500 \
-  --taxonomy-chunk-size 50
+  --chunk-max-words 500
 ```
 
 **Output — labeled topics JSON** (`--output-path`):

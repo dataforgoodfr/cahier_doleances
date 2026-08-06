@@ -4,6 +4,7 @@ import pytest
 
 from tests.unit.helpers import make_merge_candidates_response, make_merges_response
 from topicbuilder.core.schemas import Taxonomy, Topic, TopicMerge
+from topicbuilder.tasks import factorize
 from topicbuilder.tasks.factorize import (
     MERGE_GENERATION_TOOL,
     MERGE_VALIDATION_TOOL,
@@ -25,54 +26,54 @@ def test_merge_tool_function_name():
     assert MERGE_VALIDATION_TOOL["function"]["name"] == "record_merges"
 
 
-def test_build_merge_candidates_messages_returns_two_messages(topic_config):
-    msgs = build_merge_generation_messages(topic_config, STUB_PROMPT)
+def test_build_merge_candidates_messages_returns_two_messages(taxonomy):
+    msgs = build_merge_generation_messages(taxonomy, STUB_PROMPT)
     assert len(msgs) == 2
 
 
-def test_build_merge_candidates_messages_system_carries_prompt(topic_config):
-    msgs = build_merge_generation_messages(topic_config, STUB_PROMPT)
+def test_build_merge_candidates_messages_system_carries_prompt(taxonomy):
+    msgs = build_merge_generation_messages(taxonomy, STUB_PROMPT)
     assert msgs[0]["role"] == "system"
     assert msgs[0]["content"] == STUB_PROMPT
 
 
-def test_build_merge_candidates_messages_user_contains_topics_header(topic_config):
-    msgs = build_merge_generation_messages(topic_config, STUB_PROMPT)
+def test_build_merge_candidates_messages_user_contains_topics_header(taxonomy):
+    msgs = build_merge_generation_messages(taxonomy, STUB_PROMPT)
     assert "## Topics" in msgs[1]["content"]
 
 
-def test_build_merge_candidates_messages_user_contains_all_names(topic_config):
-    msgs = build_merge_generation_messages(topic_config, STUB_PROMPT)
-    for t in topic_config.topics:
+def test_build_merge_candidates_messages_user_contains_all_names(taxonomy):
+    msgs = build_merge_generation_messages(taxonomy, STUB_PROMPT)
+    for t in taxonomy.topics:
         assert t.name in msgs[1]["content"]
 
 
-def test_build_merge_candidates_messages_user_excludes_descriptions(topic_config):
-    msgs = build_merge_generation_messages(topic_config, STUB_PROMPT)
-    for t in topic_config.topics:
+def test_build_merge_candidates_messages_user_excludes_descriptions(taxonomy):
+    msgs = build_merge_generation_messages(taxonomy, STUB_PROMPT)
+    for t in taxonomy.topics:
         assert t.description not in msgs[1]["content"]
 
 
-def test_build_merge_candidates_messages_topics_are_numbered(topic_config):
-    msgs = build_merge_generation_messages(topic_config, STUB_PROMPT)
-    for i in range(len(topic_config.topics)):
+def test_build_merge_candidates_messages_topics_are_numbered(taxonomy):
+    msgs = build_merge_generation_messages(taxonomy, STUB_PROMPT)
+    for i in range(len(taxonomy.topics)):
         assert f"{i + 1}." in msgs[1]["content"]
 
 
-def test_build_merge_messages_returns_two_messages(topic_config):
-    candidate = topic_config
+def test_build_merge_messages_returns_two_messages(taxonomy):
+    candidate = taxonomy
     msgs = build_merge_validation_messages(candidate, STUB_PROMPT)
     assert len(msgs) == 2
 
 
-def test_build_merge_messages_system_carries_prompt(topic_config):
-    msgs = build_merge_validation_messages(topic_config, STUB_PROMPT)
+def test_build_merge_messages_system_carries_prompt(taxonomy):
+    msgs = build_merge_validation_messages(taxonomy, STUB_PROMPT)
     assert msgs[0]["content"] == STUB_PROMPT
 
 
-def test_build_merge_messages_user_contains_name_and_description(topic_config):
-    t = next(t for t in topic_config.topics if t.name == "Water Cycle")
-    msgs = build_merge_validation_messages(topic_config, STUB_PROMPT)
+def test_build_merge_messages_user_contains_name_and_description(taxonomy):
+    t = next(t for t in taxonomy.topics if t.name == "Water Cycle")
+    msgs = build_merge_validation_messages(taxonomy, STUB_PROMPT)
     assert t.name in msgs[1]["content"]
     assert t.description in msgs[1]["content"]
 
@@ -96,59 +97,61 @@ def test_build_merge_messages_marks_validated_topic():
         (None, False),
     ],
 )
-def test_build_merge_messages_appends_instructions_section(instructions, expect_section, topic_config):
-    msgs = build_merge_validation_messages(topic_config, STUB_PROMPT, instructions)
+def test_build_merge_messages_appends_instructions_section(instructions, expect_section, taxonomy):
+    msgs = build_merge_validation_messages(taxonomy, STUB_PROMPT, instructions)
     assert ("## Instructions" in msgs[1]["content"]) == expect_section
     if instructions:
         assert instructions in msgs[1]["content"]
 
 
-def test_propose_merge_candidates_uses_correct_tool_choice(topic_config):
-    response = make_merge_candidates_response([topic_config])
+def test_propose_merge_candidates_uses_correct_tool_choice(taxonomy, clustering_config):
+    response = make_merge_candidates_response([taxonomy])
     mock_client = MagicMock(return_value=[response])
-    generate_merge_candidates(topic_config, mock_client, STUB_PROMPT, chunk_size=50)
+    generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert mock_client.call_args.kwargs["tool_choice"] == {
         "type": "function",
         "function": {"name": "propose_merge_candidates"},
     }
 
 
-def test_propose_merge_candidates_returns_valid_groups(topic_config):
-    response = make_merge_candidates_response([topic_config])
+def test_propose_merge_candidates_returns_valid_groups(taxonomy, clustering_config):
+    response = make_merge_candidates_response([taxonomy])
     mock_client = MagicMock(return_value=[response])
-    result = generate_merge_candidates(topic_config, mock_client, STUB_PROMPT, chunk_size=50)
+    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert len(result) == 1
     assert {t.name for t in result[0].topics} == {"Water Cycle", "Photosynthesis"}
 
 
-def test_propose_merge_candidates_drops_names_not_in_taxonomy(topic_config):
+def test_propose_merge_candidates_drops_names_not_in_taxonomy(taxonomy, clustering_config):
     group = Taxonomy(topics=[Topic(name="Water Cycle", description="d"), Topic(name="Unknown Topic", description="d")])
     response = make_merge_candidates_response([group])
     mock_client = MagicMock(return_value=[response])
-    result = generate_merge_candidates(topic_config, mock_client, STUB_PROMPT, chunk_size=50)
+    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert result == []
 
 
-def test_propose_merge_candidates_drops_groups_with_fewer_than_two_valid_names():
+def test_propose_merge_candidates_drops_groups_with_fewer_than_two_valid_names(clustering_config):
     # Single-topic taxonomy: both 'A' and 'Unknown' snap to the only available name 'A',
     # deduplication leaves one entry, and the group (len < 2) is discarded.
     taxonomy = Taxonomy(topics=[Topic(name="A", description="d")])
     group = Taxonomy(topics=[Topic(name="A", description="d"), Topic(name="Unknown", description="d")])
     response = make_merge_candidates_response([group])
     mock_client = MagicMock(return_value=[response])
-    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, chunk_size=50)
+    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert result == []
 
 
-def test_propose_merge_candidates_calls_client_once_with_one_input_per_chunk():
+def test_propose_merge_candidates_calls_client_once_with_one_input_per_chunk(clustering_config, monkeypatch):
     taxonomy = Taxonomy(topics=[Topic(name=str(i), description="d") for i in range(6)])
+    chunks = [Taxonomy(topics=taxonomy.topics[:3]), Taxonomy(topics=taxonomy.topics[3:])]
+    monkeypatch.setattr(factorize, "clusterize_taxonomy_by_level", lambda t, c: chunks)
     mock_client = MagicMock(return_value=[make_merge_candidates_response([]), make_merge_candidates_response([])])
-    generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, chunk_size=3)
+    generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert mock_client.call_count == 1
     assert len(mock_client.call_args.kwargs["inputs"]) == 2
 
 
-def test_propose_merge_candidates_merges_results_across_chunks():
+def test_propose_merge_candidates_merges_results_across_chunks(clustering_config, monkeypatch):
     taxonomy = Taxonomy(
         topics=[
             Topic(name="A", description="d"),
@@ -157,6 +160,8 @@ def test_propose_merge_candidates_merges_results_across_chunks():
             Topic(name="D", description="d"),
         ]
     )
+    chunks = [Taxonomy(topics=taxonomy.topics[:2]), Taxonomy(topics=taxonomy.topics[2:])]
+    monkeypatch.setattr(factorize, "clusterize_taxonomy_by_level", lambda t, c: chunks)
 
     def adaptive_client(inputs, tools, tool_choice):
         responses = []
@@ -167,12 +172,12 @@ def test_propose_merge_candidates_merges_results_across_chunks():
         return responses
 
     mock_client = MagicMock(side_effect=adaptive_client)
-    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, chunk_size=2)
+    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     all_names = {t.name for g in result for t in g.topics}
     assert all_names == {"A", "B", "C", "D"}
 
 
-def test_propose_merge_candidates_dedupes_names_across_groups():
+def test_propose_merge_candidates_dedupes_names_across_groups(clustering_config):
     taxonomy = Taxonomy(
         topics=[
             Topic(name="A", description="d"),
@@ -184,7 +189,7 @@ def test_propose_merge_candidates_dedupes_names_across_groups():
     group2 = Taxonomy(topics=[Topic(name="A", description="d"), Topic(name="C", description="d")])
     response = make_merge_candidates_response([group1, group2])
     mock_client = MagicMock(return_value=[response])
-    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, chunk_size=50)
+    result = generate_merge_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     all_names = [t.name for g in result for t in g.topics]
     assert all_names.count("A") <= 1
 
@@ -196,30 +201,30 @@ def test_resolve_merges_returns_empty_list_when_no_candidates():
     mock_client.assert_not_called()
 
 
-def test_resolve_merges_calls_client_once_per_candidate(topic_config):
+def test_resolve_merges_calls_client_once_per_candidate(taxonomy):
     merge = TopicMerge(
         sources=Taxonomy(topics=[Topic(name="Photosynthesis", description="d")]),
         target=Topic(name="Water Cycle", description="d"),
     )
     response = make_merges_response(merge)
     mock_client = MagicMock(return_value=[response])
-    validate_merge_candidates([topic_config], mock_client, STUB_PROMPT)
+    validate_merge_candidates([taxonomy], mock_client, STUB_PROMPT)
     inputs = mock_client.call_args.kwargs["inputs"]
     assert len(inputs) == 1
 
 
-def test_resolve_merges_filters_target_not_in_group(topic_config):
+def test_resolve_merges_filters_target_not_in_group(taxonomy):
     merge = TopicMerge(
         sources=Taxonomy(topics=[Topic(name="Water Cycle", description="d")]),
         target=Topic(name="Outside Topic", description="d"),
     )
     response = make_merges_response(merge)
     mock_client = MagicMock(return_value=[response])
-    result = validate_merge_candidates([topic_config], mock_client, STUB_PROMPT)
+    result = validate_merge_candidates([taxonomy], mock_client, STUB_PROMPT)
     assert result == []
 
 
-def test_resolve_merges_filters_sources_outside_group(topic_config):
+def test_resolve_merges_filters_sources_outside_group(taxonomy):
     merge = TopicMerge(
         sources=Taxonomy(
             topics=[Topic(name="Photosynthesis", description="d"), Topic(name="Not In Group", description="d")]
@@ -228,27 +233,27 @@ def test_resolve_merges_filters_sources_outside_group(topic_config):
     )
     response = make_merges_response(merge)
     mock_client = MagicMock(return_value=[response])
-    result = validate_merge_candidates([topic_config], mock_client, STUB_PROMPT)
+    result = validate_merge_candidates([taxonomy], mock_client, STUB_PROMPT)
     assert len(result) == 1
     source_names = [s.name for s in result[0].sources.topics]
     assert "Not In Group" not in source_names
 
 
-def test_resolve_merges_drops_merge_when_sources_all_remap_to_target(topic_config):
+def test_resolve_merges_drops_merge_when_sources_all_remap_to_target(taxonomy):
     merge = TopicMerge(
         sources=Taxonomy(topics=[Topic(name="Water Cycle", description="d")]),
         target=Topic(name="Water Cycle", description="d"),
     )
     response = make_merges_response(merge)
     mock_client = MagicMock(return_value=[response])
-    result = validate_merge_candidates([topic_config], mock_client, STUB_PROMPT)
+    result = validate_merge_candidates([taxonomy], mock_client, STUB_PROMPT)
     assert result == []
 
 
-def test_resolve_merges_uses_correct_tool_choice(topic_config):
+def test_resolve_merges_uses_correct_tool_choice(taxonomy):
     response = make_merges_response(None)
     mock_client = MagicMock(return_value=[response])
-    validate_merge_candidates([topic_config], mock_client, STUB_PROMPT)
+    validate_merge_candidates([taxonomy], mock_client, STUB_PROMPT)
     assert mock_client.call_args.kwargs["tool_choice"] == {
         "type": "function",
         "function": {"name": "record_merges"},
@@ -300,9 +305,9 @@ def test_apply_merges_retains_target_topic():
     assert any(t.name == "A" for t in result.topics)
 
 
-def test_apply_merges_empty_merges_returns_unchanged_taxonomy(topic_config):
-    result = insert_merges(topic_config, [])
-    assert [t.name for t in result.topics] == [t.name for t in topic_config.topics]
+def test_apply_merges_empty_merges_returns_unchanged_taxonomy(taxonomy):
+    result = insert_merges(taxonomy, [])
+    assert [t.name for t in result.topics] == [t.name for t in taxonomy.topics]
 
 
 def test_apply_merges_redirects_parent_reference_to_target():

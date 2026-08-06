@@ -5,7 +5,12 @@ from loguru import logger
 from pydantic import BaseModel
 
 from topicbuilder.core.client import LLMClient, parse_tool_arguments
-from topicbuilder.core.clustering import chunk_text, clusterize_taxonomy_by_level, most_similar_topic
+from topicbuilder.core.clustering import (
+    ClusteringConfig,
+    chunk_text,
+    clusterize_taxonomy_by_level,
+    most_similar_topic,
+)
 from topicbuilder.core.io import read_dataset, read_taxonomy, read_text, write_json
 from topicbuilder.core.schemas import Document, DocumentLabels, Label, LabeledDataset, Taxonomy
 from topicbuilder.core.taxonomy import display_duplicates, sanitize_taxonomy
@@ -72,6 +77,12 @@ def label(
         exists=True,
         help="Path to the markdown system prompt file.",
     ),
+    clustering_config_path: Path = typer.Option(
+        Path("conf/clustering/default.yaml"),
+        "--clustering-config-path",
+        exists=True,
+        help="Path to the clustering config YAML.",
+    ),
     output_path: Path = typer.Option(
         ...,
         "--output-path",
@@ -81,11 +92,6 @@ def label(
         500,
         "--chunk-max-words",
         help="Maximum number of words per text chunk.",
-    ),
-    taxonomy_chunk_size: int = typer.Option(
-        50,
-        "--taxonomy-chunk-size",
-        help="Maximum number of level-0 topics per taxonomy chunk.",
     ),
 ) -> None:
     """
@@ -97,12 +103,20 @@ def label(
     taxonomy = read_taxonomy(taxonomy_path)
     client = LLMClient.from_config(llm_config_path)
     prompt = read_text(prompt_path)
+    clustering_config = ClusteringConfig.from_config(clustering_config_path)
 
     # ensure taxonomy is healthy
     taxonomy = sanitize_taxonomy(taxonomy)
 
     # run labeling
-    labeled = generate_labels(documents, taxonomy, client, prompt, chunk_max_words, taxonomy_chunk_size)
+    labeled = generate_labels(
+        documents=documents,
+        taxonomy=taxonomy,
+        client=client,
+        prompt=prompt,
+        chunk_max_words=chunk_max_words,
+        clustering_config=clustering_config,
+    )
 
     # save output artifacts
     write_json(labeled, output_path)
@@ -116,7 +130,7 @@ def generate_labels(
     client: LLMClient,
     prompt: str,
     chunk_max_words: int,
-    taxonomy_chunk_size: int,
+    clustering_config: ClusteringConfig,
 ) -> LabeledDataset:
     """
     Chunk each document's text and the level-0 taxonomy, send all (text chunk x topic chunk) pairs
@@ -128,7 +142,7 @@ def generate_labels(
     # check for duplicate topic names
     display_duplicates(taxonomy)
 
-    topic_chunks = clusterize_taxonomy_by_level(taxonomy, taxonomy_chunk_size)
+    topic_chunks = clusterize_taxonomy_by_level(taxonomy, clustering_config)
     text_chunks = [(doc, chunk) for doc in documents for chunk in chunk_text(doc.content, chunk_max_words)]
     triples = [(doc, text_chunk, topic_chunk) for (doc, text_chunk) in text_chunks for topic_chunk in topic_chunks]
     logger.info(

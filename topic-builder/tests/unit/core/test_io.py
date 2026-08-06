@@ -23,10 +23,10 @@ def test_read_text_raises_on_missing_file(tmp_path):
         read_text(tmp_path / "missing.txt")
 
 
-def test_read_taxonomy_roundtrip(tmp_path, topic_config):
+def test_read_taxonomy_roundtrip(tmp_path, taxonomy):
     out = tmp_path / "out.json"
-    write_json(topic_config, out)
-    assert read_taxonomy(out) == topic_config
+    write_json(taxonomy, out)
+    assert read_taxonomy(out) == taxonomy
 
 
 def test_read_taxonomy_raises_on_missing_file(tmp_path):
@@ -34,16 +34,16 @@ def test_read_taxonomy_raises_on_missing_file(tmp_path):
         read_taxonomy(tmp_path / "missing.json")
 
 
-def test_write_json_produces_valid_json(tmp_path, topic_config):
+def test_write_json_produces_valid_json(tmp_path, taxonomy):
     out = tmp_path / "out.json"
-    write_json(topic_config, out)
+    write_json(taxonomy, out)
     data = json.loads(out.read_text(encoding="utf-8"))
     assert "topics" in data
 
 
-def test_write_json_creates_parent_directories(tmp_path, topic_config):
+def test_write_json_creates_parent_directories(tmp_path, taxonomy):
     out = tmp_path / "nested" / "dir" / "out.json"
-    write_json(topic_config, out)
+    write_json(taxonomy, out)
     assert out.exists()
 
 

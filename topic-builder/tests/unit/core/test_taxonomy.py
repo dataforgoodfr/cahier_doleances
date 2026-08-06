@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+import networkx as nx
 import pytest
 
 from topicbuilder.core.schemas import Taxonomy, Topic
@@ -136,6 +137,16 @@ def test_find_multi_path_pairs_returns_empty_for_isolated_nodes():
     taxonomy = Taxonomy(topics=[Topic(name="A", description="d"), Topic(name="B", description="d")])
     graph, id_to_name = build_graph(taxonomy)
     assert find_multi_path_pairs(graph, id_to_name) == []
+
+
+def test_find_multi_path_pairs_reports_diamond_shaped_reachability():
+    graph = nx.DiGraph([("1", "2"), ("1", "3"), ("2", "4"), ("3", "4")])
+    id_to_name = {"1": "A", "2": "B", "3": "C", "4": "D"}
+    result = find_multi_path_pairs(graph, id_to_name)
+    assert len(result) == 1
+    assert result[0].source == "A"
+    assert result[0].target == "D"
+    assert {tuple(path) for path in result[0].paths} == {("A", "B", "D"), ("A", "C", "D")}
 
 
 # Pre-computed module-level fixtures for the parametrize below

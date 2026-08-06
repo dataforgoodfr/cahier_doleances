@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 from tests.unit.helpers import make_parent_candidates_response, make_parent_response
 from topicbuilder.core.schemas import ParentAddition, ParentCandidate, Taxonomy, Topic
+from topicbuilder.tasks import discover_parents
 from topicbuilder.tasks.discover_parents import (
     PARENT_GENERATION_TOOL,
     PARENT_VALIDATION_TOOL,
@@ -23,55 +24,55 @@ def test_parent_tool_function_name():
     assert PARENT_VALIDATION_TOOL["function"]["name"] == "record_parent"
 
 
-def test_build_parent_candidates_messages_returns_two_messages(topic_config):
-    msgs = build_parent_generation_messages(topic_config, STUB_PROMPT)
+def test_build_parent_candidates_messages_returns_two_messages(taxonomy):
+    msgs = build_parent_generation_messages(taxonomy, STUB_PROMPT)
     assert len(msgs) == 2
 
 
-def test_build_parent_candidates_messages_system_carries_prompt(topic_config):
-    msgs = build_parent_generation_messages(topic_config, STUB_PROMPT)
+def test_build_parent_candidates_messages_system_carries_prompt(taxonomy):
+    msgs = build_parent_generation_messages(taxonomy, STUB_PROMPT)
     assert msgs[0]["role"] == "system"
     assert msgs[0]["content"] == STUB_PROMPT
 
 
-def test_build_parent_candidates_messages_user_contains_topics_header(topic_config):
-    msgs = build_parent_generation_messages(topic_config, STUB_PROMPT)
+def test_build_parent_candidates_messages_user_contains_topics_header(taxonomy):
+    msgs = build_parent_generation_messages(taxonomy, STUB_PROMPT)
     assert "## Topics" in msgs[1]["content"]
 
 
-def test_build_parent_candidates_messages_user_contains_all_names(topic_config):
-    msgs = build_parent_generation_messages(topic_config, STUB_PROMPT)
-    for t in topic_config.topics:
+def test_build_parent_candidates_messages_user_contains_all_names(taxonomy):
+    msgs = build_parent_generation_messages(taxonomy, STUB_PROMPT)
+    for t in taxonomy.topics:
         assert t.name in msgs[1]["content"]
 
 
-def test_build_parent_candidates_messages_user_excludes_descriptions(topic_config):
-    msgs = build_parent_generation_messages(topic_config, STUB_PROMPT)
-    for t in topic_config.topics:
+def test_build_parent_candidates_messages_user_excludes_descriptions(taxonomy):
+    msgs = build_parent_generation_messages(taxonomy, STUB_PROMPT)
+    for t in taxonomy.topics:
         assert t.description not in msgs[1]["content"]
 
 
-def test_build_parent_messages_returns_two_messages(topic_config):
-    candidate = ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[topic_config.topics[0]]))
+def test_build_parent_messages_returns_two_messages(taxonomy):
+    candidate = ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[taxonomy.topics[0]]))
     msgs = build_parent_validation_messages(candidate, STUB_PROMPT)
     assert len(msgs) == 2
 
 
-def test_build_parent_messages_user_contains_parent_candidate_header(topic_config):
-    candidate = ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[topic_config.topics[0]]))
+def test_build_parent_messages_user_contains_parent_candidate_header(taxonomy):
+    candidate = ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[taxonomy.topics[0]]))
     msgs = build_parent_validation_messages(candidate, STUB_PROMPT)
     assert "## Parent candidate" in msgs[1]["content"]
     assert "Earth Sciences" in msgs[1]["content"]
 
 
-def test_build_parent_messages_user_contains_children_candidates_header(topic_config):
-    candidate = ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[topic_config.topics[0]]))
+def test_build_parent_messages_user_contains_children_candidates_header(taxonomy):
+    candidate = ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[taxonomy.topics[0]]))
     msgs = build_parent_validation_messages(candidate, STUB_PROMPT)
     assert "## Children candidates" in msgs[1]["content"]
 
 
-def test_build_parent_messages_user_contains_child_name_and_description(topic_config):
-    t = next(t for t in topic_config.topics if t.name == "Water Cycle")
+def test_build_parent_messages_user_contains_child_name_and_description(taxonomy):
+    t = next(t for t in taxonomy.topics if t.name == "Water Cycle")
     candidate = ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[t]))
     msgs = build_parent_validation_messages(candidate, STUB_PROMPT)
     assert t.name in msgs[1]["content"]
@@ -91,40 +92,40 @@ def test_build_parent_messages_marks_validated_child():
     assert "B [validated]" not in msgs[1]["content"]
 
 
-def test_propose_parent_candidates_uses_correct_tool_choice(topic_config):
+def test_propose_parent_candidates_uses_correct_tool_choice(taxonomy, clustering_config):
     response = make_parent_candidates_response(
-        [ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[topic_config.topics[0]]))]
+        [ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[taxonomy.topics[0]]))]
     )
     mock_client = MagicMock(return_value=[response])
-    generate_parent_candidates(topic_config, mock_client, STUB_PROMPT, chunk_size=50)
+    generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert mock_client.call_args.kwargs["tool_choice"] == {
         "type": "function",
         "function": {"name": "propose_parent_candidates"},
     }
 
 
-def test_propose_parent_candidates_returns_valid_candidates(topic_config):
-    candidates = [ParentCandidate(parent="Earth Sciences", children=topic_config)]
+def test_propose_parent_candidates_returns_valid_candidates(taxonomy, clustering_config):
+    candidates = [ParentCandidate(parent="Earth Sciences", children=taxonomy)]
     response = make_parent_candidates_response(candidates)
     mock_client = MagicMock(return_value=[response])
-    result = generate_parent_candidates(topic_config, mock_client, STUB_PROMPT, chunk_size=50)
+    result = generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert len(result) == 1
     assert result[0].parent == "Earth Sciences"
     assert "Water Cycle" in [t.name for t in result[0].children.topics]
 
 
-def test_propose_parent_candidates_snaps_children_to_nearest_chunk_name(topic_config):
-    photo = next(t for t in topic_config.topics if t.name == "Photosynthesis")
+def test_propose_parent_candidates_snaps_children_to_nearest_chunk_name(taxonomy, clustering_config):
+    photo = next(t for t in taxonomy.topics if t.name == "Photosynthesis")
     response = make_parent_candidates_response(
         [ParentCandidate(parent="P", children=Taxonomy(topics=[Topic(name="Photosynthesi", description="d")]))]
     )
     mock_client = MagicMock(return_value=[response])
-    result = generate_parent_candidates(topic_config, mock_client, STUB_PROMPT, chunk_size=50)
+    result = generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert len(result) == 1
     assert result[0].children.topics[0].id == photo.id
 
 
-def test_propose_parent_candidates_dedupes_children_across_candidates():
+def test_propose_parent_candidates_dedupes_children_across_candidates(clustering_config):
     taxonomy = Taxonomy(
         topics=[
             Topic(name="A", description="d"),
@@ -138,25 +139,27 @@ def test_propose_parent_candidates_dedupes_children_across_candidates():
         ]
     )
     mock_client = MagicMock(return_value=[response])
-    result = generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, chunk_size=50)
+    result = generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     all_children = [t.name for c in result for t in c.children.topics]
     assert all_children.count("A") <= 1
 
 
-def test_propose_parent_candidates_calls_client_once_with_one_input_per_chunk():
+def test_propose_parent_candidates_calls_client_once_with_one_input_per_chunk(clustering_config, monkeypatch):
     taxonomy = Taxonomy(topics=[Topic(name=str(i), description="d") for i in range(6)])
+    chunks = [Taxonomy(topics=taxonomy.topics[:3]), Taxonomy(topics=taxonomy.topics[3:])]
+    monkeypatch.setattr(discover_parents, "clusterize_taxonomy_by_level", lambda t, c: chunks)
     mock_client = MagicMock(
         return_value=[
             make_parent_candidates_response([]),
             make_parent_candidates_response([]),
         ]
     )
-    generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, chunk_size=3)
+    generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     assert mock_client.call_count == 1
     assert len(mock_client.call_args.kwargs["inputs"]) == 2
 
 
-def test_propose_parent_candidates_merges_results_across_chunks():
+def test_propose_parent_candidates_merges_results_across_chunks(clustering_config):
     topics = [Topic(name=n, description="d") for n in ["A", "B", "C", "D"]]
     taxonomy = Taxonomy(topics=topics)
 
@@ -173,22 +176,22 @@ def test_propose_parent_candidates_merges_results_across_chunks():
         return responses
 
     mock_client = MagicMock(side_effect=adaptive_client)
-    result = generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, chunk_size=2)
+    result = generate_parent_candidates(taxonomy, mock_client, STUB_PROMPT, clustering_config)
     all_children = {t.name for c in result for t in c.children.topics}
     assert all_children == {"A", "B", "C", "D"}
 
 
-def test_resolve_parent_candidates_returns_empty_list_when_no_candidates(topic_config):
+def test_resolve_parent_candidates_returns_empty_list_when_no_candidates(taxonomy):
     mock_client = MagicMock()
     result = validate_parent_candidates([], mock_client, STUB_PROMPT)
     assert result == []
     mock_client.assert_not_called()
 
 
-def test_resolve_parent_candidates_calls_client_once_per_candidate(topic_config):
-    candidates = [ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[topic_config.topics[0]]))]
+def test_resolve_parent_candidates_calls_client_once_per_candidate(taxonomy):
+    candidates = [ParentCandidate(parent="Earth Sciences", children=Taxonomy(topics=[taxonomy.topics[0]]))]
     addition = ParentAddition(
-        parent=Topic(name="Earth Sciences", description="desc"), children=Taxonomy(topics=[topic_config.topics[0]])
+        parent=Topic(name="Earth Sciences", description="desc"), children=Taxonomy(topics=[taxonomy.topics[0]])
     )
     mock_client = MagicMock(return_value=[make_parent_response(addition)])
     validate_parent_candidates(candidates, mock_client, STUB_PROMPT)
@@ -196,11 +199,9 @@ def test_resolve_parent_candidates_calls_client_once_per_candidate(topic_config)
     assert len(inputs) == len(candidates)
 
 
-def test_resolve_parent_candidates_uses_correct_tool_choice(topic_config):
-    candidates = [ParentCandidate(parent="P", children=Taxonomy(topics=[topic_config.topics[0]]))]
-    addition = ParentAddition(
-        parent=Topic(name="P", description="d"), children=Taxonomy(topics=[topic_config.topics[0]])
-    )
+def test_resolve_parent_candidates_uses_correct_tool_choice(taxonomy):
+    candidates = [ParentCandidate(parent="P", children=Taxonomy(topics=[taxonomy.topics[0]]))]
+    addition = ParentAddition(parent=Topic(name="P", description="d"), children=Taxonomy(topics=[taxonomy.topics[0]]))
     mock_client = MagicMock(return_value=[make_parent_response(addition)])
     validate_parent_candidates(candidates, mock_client, STUB_PROMPT)
     assert mock_client.call_args.kwargs["tool_choice"] == {
@@ -260,10 +261,10 @@ def test_resolve_parent_candidates_dedupes_children_across_candidates():
     assert all_children.count("A") <= 1
 
 
-def test_resolve_parent_candidates_carries_description_from_llm_response(topic_config):
-    candidates = [ParentCandidate(parent="Earth Sciences", children=topic_config)]
+def test_resolve_parent_candidates_carries_description_from_llm_response(taxonomy):
+    candidates = [ParentCandidate(parent="Earth Sciences", children=taxonomy)]
     addition = ParentAddition(
-        parent=Topic(name="Earth Sciences", description="Natural earth processes."), children=topic_config
+        parent=Topic(name="Earth Sciences", description="Natural earth processes."), children=taxonomy
     )
     mock_client = MagicMock(return_value=[make_parent_response(addition)])
     result = validate_parent_candidates(candidates, mock_client, STUB_PROMPT)
@@ -331,6 +332,6 @@ def test_apply_parents_does_not_duplicate_existing_parent():
     assert sum(1 for t in result.topics if t.name == "P") == 1
 
 
-def test_apply_parents_empty_additions_returns_unchanged_taxonomy(topic_config):
-    result = insert_parents(topic_config, [])
-    assert [t.name for t in result.topics] == [t.name for t in topic_config.topics]
+def test_apply_parents_empty_additions_returns_unchanged_taxonomy(taxonomy):
+    result = insert_parents(taxonomy, [])
+    assert [t.name for t in result.topics] == [t.name for t in taxonomy.topics]

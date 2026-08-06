@@ -83,8 +83,8 @@ def test_topic_raises_on_missing_field(missing_field: str):
 # --- TopicConfig ---
 
 
-def test_topicconfig_wraps_topic_list(topic_config):
-    assert len(topic_config.topics) == 2
+def test_topicconfig_wraps_topic_list(taxonomy):
+    assert len(taxonomy.topics) == 2
 
 
 def test_topicconfig_accepts_empty_list():
@@ -92,10 +92,10 @@ def test_topicconfig_accepts_empty_list():
     assert tc.topics == []
 
 
-def test_topicconfig_model_validate_roundtrip(topic_config):
-    raw = topic_config.model_dump()
+def test_topicconfig_model_validate_roundtrip(taxonomy):
+    raw = taxonomy.model_dump()
     result = Taxonomy.model_validate(raw)
-    assert result == topic_config
+    assert result == taxonomy
 
 
 @pytest.mark.parametrize(
