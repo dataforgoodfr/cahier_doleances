@@ -141,11 +141,11 @@ def extract_pdf_pages(filepath: str | Path, engine: Engine | None = None) -> int
         raise FileNotFoundError(f"File not found: {filepath}")
 
     pdf_name = filepath.name
-    logger.info("Opening PDF: %s", pdf_name)
+    logger.debug("Opening PDF: %s", pdf_name)
 
     doc = fitz.open(filepath)
     page_count = doc.page_count
-    logger.info("Pages: %d", page_count)
+    logger.debug("Pages: %d", page_count)
 
     raw_pages: list[str] = []
     for i in range(page_count):
@@ -160,7 +160,6 @@ def extract_pdf_pages(filepath: str | Path, engine: Engine | None = None) -> int
     end_page = find_end_page(raw_pages)
     if end_page is not None:
         last_page = end_page  # exclusive
-        logger.info("End marker found at page index %d", end_page)
     else:
         last_page = page_count
 

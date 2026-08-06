@@ -36,13 +36,13 @@ def main() -> int:
 
     with Session(engine) as session:
         for pdf_path in tqdm(pdf_paths, desc="Extracting PDFs"):
-            logger.info(f"\nSelected PDF: {pdf_path.name}")
-            logger.info(f"Full path: {pdf_path.resolve()}")
+            logger.debug(f"\nSelected PDF: {pdf_path.name}")
+            logger.debug(f"Full path: {pdf_path.resolve()}")
 
             try:
                 contribution_id = extract_pdf_pages(pdf_path)
             except Exception as exc:  # noqa: BLE001 - catch any per-PDF failure to keep the batch running
-                logger.info(
+                logger.warning(
                     f"Failed to extract {pdf_path.name}: {exc}",
                     file=sys.stderr,
                 )
@@ -51,7 +51,7 @@ def main() -> int:
 
             contribution = session.get(Contribution, contribution_id)
             if contribution is None:
-                logger.info(
+                logger.warning(
                     f"Contribution id={contribution_id} not found in DB",
                     file=sys.stderr,
                 )
