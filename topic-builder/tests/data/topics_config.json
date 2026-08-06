@@ -14,6 +14,16 @@
       "name": "Photosynthesis",
       "description": "The process by which plants convert sunlight and CO2 into glucose and oxygen.",
       "parent": null
+    },
+    {
+      "name": "IA",
+      "description": "Artificial Intelligence.",
+      "parent": null
+    },
+    {
+      "name": "Mathematics",
+      "description": "The Mathematics.",
+      "parent": null
     }
   ]
 }

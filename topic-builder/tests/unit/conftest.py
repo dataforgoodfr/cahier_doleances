@@ -1,5 +1,6 @@
 import pytest
 
+from topicbuilder.core.clustering import ClusteringConfig
 from topicbuilder.core.schemas import (
     FactorizeReport,
     Label,
@@ -9,6 +10,29 @@ from topicbuilder.core.schemas import (
     Topic,
     TopicMerge,
 )
+from topicbuilder.tasks import discover_parents, factorize, label
+
+
+def stub_clusterize_taxonomy_by_level(taxonomy: Taxonomy, config: ClusteringConfig) -> list[Taxonomy]:
+    """
+    Stand in for clusterize_taxonomy_by_level: group topics by level only, with no embedding
+    or clustering involved. Tests that need multiple chunks within a level should override
+    this stub via `monkeypatch.setattr` on the relevant task module.
+    """
+    levels = sorted({t.level for t in taxonomy.topics})
+    return [Taxonomy(topics=[t for t in taxonomy.topics if t.level == lvl]) for lvl in levels]
+
+
+@pytest.fixture
+def clustering_config(monkeypatch: pytest.MonkeyPatch) -> ClusteringConfig:
+    """
+    Return a valid ClusteringConfig and stub clusterize_taxonomy_by_level across task modules,
+    so tests requesting this fixture never invoke the real embedding/UMAP/HDBSCAN pipeline.
+    """
+    monkeypatch.setattr(discover_parents, "clusterize_taxonomy_by_level", stub_clusterize_taxonomy_by_level)
+    monkeypatch.setattr(factorize, "clusterize_taxonomy_by_level", stub_clusterize_taxonomy_by_level)
+    monkeypatch.setattr(label, "clusterize_taxonomy_by_level", stub_clusterize_taxonomy_by_level)
+    return ClusteringConfig.from_config("tests/conf/test_clustering.yaml")
 
 
 @pytest.fixture
@@ -20,7 +44,7 @@ def topic() -> Topic:
 
 
 @pytest.fixture
-def topic_config(topic: Topic) -> Taxonomy:
+def taxonomy(topic: Topic) -> Taxonomy:
     return Taxonomy(
         topics=[
             topic,
