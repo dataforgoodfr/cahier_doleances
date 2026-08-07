@@ -6,10 +6,10 @@ de les parcourir commune par commune et de les annoter (anonymisé, contribution
 
 ## Organisation
 
-- `cahier_doleances/database/` : le modèle de données et les migrations qui structurent la base PostgreSQL | [documentation](cahier_doleances/database/README.md)
-- `cahier_doleances/extraction/` : le pipeline d'extraction de texte depuis les PDFs
+- `database/` : le modèle de données et les migrations qui structurent la base PostgreSQL | [documentation](database/README.md)
+- `extraction/` : les pipelines d'extraction de texte depuis les PDFs
+  - `extraction/without_ocr/` : extraction du texte natif, sans OCR | [documentation](extraction/without_ocr/README.md)
 - `gradio_app/` : l'interface pour parcourir les contributions et les annoter | [documentation](gradio_app/README.md)
-- `scripts/` : scripts utilitaires (extraction par lot)
 - `topic-builder/` : l'utilitaire de découverte, structuration et annotation des thèmes abordés dans les contributions | [documentation](topic-builder/README.md)
 
 ## Installation
@@ -31,19 +31,22 @@ source .venv/bin/activate
 Ou préfixez vos commandes par `uv run` :
 
 ```bash
-uv run python -m cahier_doleances.database.seed_mock # remplit la base avec le seed de démo
+uv run python -m database.seed_mock # remplit la base avec le seed de démo
 uv run python gradio_app/app.py # lance l'app
 ```
 
 ## Base de données
 
 La connexion PostgreSQL est lue depuis `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`,
-`DB_PASSWORD`, `DB_NAME`). Voir [cahier_doleances/database/README.md](cahier_doleances/database/README.md) pour le modèle,
+`DB_PASSWORD`, `DB_NAME`). Voir [database/README.md](database/README.md) pour le modèle,
 les migrations Alembic et le seed.
 
 ## Extraction des PDFs
 
-Les PDFs des cahiers de doléances sont traités par le module `cahier_doleances/extraction/`. Le texte natif est extrait page par page, stocké dans la table `page_extraction`, et un score de qualité permet de détecter les pages manuscrites. Le détail du pipeline et les commandes sont dans [cahier_doleances/database/README.md](cahier_doleances/database/README.md#extraction-des-pdfs).
+Le module `extraction/without_ocr/` extrait le texte natif des PDFs page par page, le
+stocke dans la table `page_extraction`, et calcule un score de qualité qui permet de
+détecter les pages manuscrites. Le détail du pipeline et les commandes sont dans
+[extraction/without_ocr/README.md](extraction/without_ocr/README.md).
 
 ## Qualité et sécurité du code (pre-commit)
 

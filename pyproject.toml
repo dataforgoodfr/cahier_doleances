@@ -1,6 +1,3 @@
-[tool.setuptools.packages.find]
-include = ["cahier_doleances*"]
-
 [project]
 name = "cahier_doleances"
 version = "0.1.0"
@@ -25,11 +22,15 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "requests>=2.32.3",
     "sqlalchemy>=2.0.44",
-    "ruff",
     "tqdm>=4.68.0",
-    "ty",
     "wordfreq>=3.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "ruff", "ty"]
+
+[tool.pytest.ini_options]
+# `topic-builder/` est un projet uv autonome (dépendances et lockfile séparés) :
+# il se teste depuis son propre dossier, pas depuis la racine.
+testpaths = ["extraction"]
+pythonpath = ["."]

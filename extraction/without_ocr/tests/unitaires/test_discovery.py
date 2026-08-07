@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from cahier_doleances.extraction.discovery import (
+from extraction.without_ocr.discovery import (
     _natural_sort_key,
     first_pdf,
     list_pdfs,
@@ -67,7 +67,7 @@ def test_first_pdf_raises_when_no_pdf_found(tmp_path: Path):
 
 def test_require_path_to_data_uses_setting(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
-        "cahier_doleances.extraction.discovery.settings.path_to_data",
+        "extraction.without_ocr.discovery.settings.path_to_data",
         str(tmp_path),
     )
     assert require_path_to_data() == tmp_path
@@ -75,7 +75,7 @@ def test_require_path_to_data_uses_setting(monkeypatch, tmp_path: Path):
 
 def test_require_path_to_data_raises_when_empty(monkeypatch):
     monkeypatch.setattr(
-        "cahier_doleances.extraction.discovery.settings.path_to_data",
+        "extraction.without_ocr.discovery.settings.path_to_data",
         "",
     )
     with pytest.raises(ValueError):

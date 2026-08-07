@@ -10,12 +10,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
-from cahier_doleances.database.db import get_engine
-from cahier_doleances.database.models import Contribution, PageExtraction
-from cahier_doleances.extraction.discovery import list_pdfs, require_path_to_data
-from cahier_doleances.extraction.extract_text import extract_pdf_pages
-from cahier_doleances.settings import logger
-from cahier_doleances.utils.timing import timed
+from database.db import get_engine
+from database.models import Contribution, PageExtraction
+from extraction.without_ocr.discovery import list_pdfs, require_path_to_data
+from extraction.without_ocr.extract_text import extract_pdf_pages
+from extraction.without_ocr.settings import logger
+from extraction.without_ocr.timing import timed
 
 
 @timed
@@ -40,21 +40,15 @@ def main() -> int:
             logger.debug(f"Full path: {pdf_path.resolve()}")
 
             try:
-                contribution_id = extract_pdf_pages(pdf_path)
-            except Exception as exc:  # noqa: BLE001 - catch any per-PDF failure to keep the batch running
-                logger.warning(
-                    f"Failed to extract {pdf_path.name}: {exc}",
-                    file=sys.stderr,
-                )
+                contribution_id = extract_pdf_pages(pdf_path, engine=engine)
+            except Exception:  # noqa: BLE001 - catch any per-PDF failure to keep the batch running
+                logger.exception("Failed to extract %s", pdf_path.name)
                 failed.append(pdf_path.name)
                 continue
 
             contribution = session.get(Contribution, contribution_id)
             if contribution is None:
-                logger.warning(
-                    f"Contribution id={contribution_id} not found in DB",
-                    file=sys.stderr,
-                )
+                logger.warning("Contribution id=%d not found in DB", contribution_id)
                 failed.append(pdf_path.name)
                 continue
 

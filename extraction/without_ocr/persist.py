@@ -5,9 +5,9 @@ from typing import cast
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from cahier_doleances.database.db import get_engine
-from cahier_doleances.database.models import Contribution, PageExtraction
-from cahier_doleances.settings import logger
+from database.db import get_engine
+from database.models import Contribution, PageExtraction
+from extraction.without_ocr.settings import logger
 
 
 def save_page_extractions(

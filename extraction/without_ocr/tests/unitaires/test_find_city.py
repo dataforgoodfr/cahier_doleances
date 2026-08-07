@@ -1,6 +1,6 @@
 """Unit tests for city extraction (regex) and end markers."""
 
-from cahier_doleances.extraction.extract_text import find_city, find_end_page
+from extraction.without_ocr.extract_text import find_city, find_end_page
 
 
 def test_find_city_nominal():

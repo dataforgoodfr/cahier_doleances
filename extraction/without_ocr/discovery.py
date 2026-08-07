@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from cahier_doleances.settings import logger, settings
+from extraction.without_ocr.settings import logger, settings
 
 
 def _natural_sort_key(path: Path) -> list[str | int]:

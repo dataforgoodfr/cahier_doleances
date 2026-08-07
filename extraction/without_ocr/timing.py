@@ -3,7 +3,7 @@
 import functools
 import time
 
-from cahier_doleances.settings import logger
+from extraction.without_ocr.settings import logger
 
 
 def timed(_func=None):
