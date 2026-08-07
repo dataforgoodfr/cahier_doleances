@@ -41,7 +41,9 @@ class LLMClient:
         """
         self.model = model
         self.client = self.init_client(backend, api_key_env_var, endpoint_args)
-        self.semaphore = asyncio.Semaphore(pool_size)
+        self.pool_size = pool_size
+        self._semaphore: asyncio.Semaphore | None = None
+        self._semaphore_loop: asyncio.AbstractEventLoop | None = None
 
     @classmethod
     def from_config(cls, config_path: str | Path) -> "LLMClient":
@@ -69,11 +71,22 @@ class LLMClient:
         """
         return await self.client.chat.completions.create(model=self.model, messages=messages, **kwargs)
 
+    def _get_semaphore(self) -> asyncio.Semaphore:
+        """
+        Return a semaphore bound to the currently running event loop, recreating it
+        whenever the loop has changed (e.g. across successive `asyncio.run` calls).
+        """
+        loop = asyncio.get_running_loop()
+        if self._semaphore is None or self._semaphore_loop is not loop:
+            self._semaphore = asyncio.Semaphore(self.pool_size)
+            self._semaphore_loop = loop
+        return self._semaphore
+
     async def async_run_one(self, messages: list[ChatMessage], **kwargs: Any) -> ChatCompletion:
         """
         Run the async query inside the semaphore for concurrency control.
         """
-        async with self.semaphore:
+        async with self._get_semaphore():
             return await self.async_query(messages, **kwargs)
 
     async def async_run_all(self, inputs: list[list[ChatMessage]], **kwargs: Any) -> list[ChatCompletion]:

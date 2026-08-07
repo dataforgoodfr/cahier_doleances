@@ -75,6 +75,14 @@ def run() -> None:
             f"Expected topics missing from output: {expected_names - labeled_names}"
         )
 
+        taxonomy = load_json(TAXONOMY_PATH)
+        sources_by_name = {t["name"]: set(t["sources"]) for t in taxonomy["topics"]}
+        for doc in output["documents"]:
+            for label in doc["labels"]:
+                assert doc["id"] in sources_by_name.get(label["name"], set()), (
+                    f"Document {doc['id']!r} labeled with topic {label['name']!r} it is not a source of"
+                )
+
         print(f"OK — {len(output['documents'])} document(s) labeled.")
 
     finally:

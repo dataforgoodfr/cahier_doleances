@@ -7,7 +7,7 @@ from topicbuilder.tasks.factorize import factorize
 from topicbuilder.tasks.label import label
 from topicbuilder.tasks.screen import screen
 
-app = typer.Typer(no_args_is_help=True, help="Topic modeling CLI with three independent tasks.")
+app = typer.Typer(no_args_is_help=True, help="Topic modeling CLI with independent tasks.")
 app.command("discover-topics")(discover_topics)
 app.command("discover-parents")(discover_parents)
 app.command()(display)

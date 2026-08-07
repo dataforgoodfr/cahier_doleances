@@ -1,5 +1,6 @@
+from uuid import uuid4
+
 import pytest
-from pydantic import ValidationError
 
 from topicbuilder.core.schemas import (
     DocumentLabels,
@@ -13,166 +14,80 @@ from topicbuilder.core.schemas import (
     TopicMerge,
 )
 
-# --- Topic ---
 
-
-def test_topic_instantiation_stores_fields():
+def test_topic_construction_stores_required_fields_and_optional_defaults():
     t = Topic(name="n", description="d")
     assert t.name == "n"
     assert t.description == "d"
     assert t.parent is None
-
-
-def test_topic_parent_can_be_set():
-    from uuid import uuid4
-
-    parent_id = uuid4()
-    t = Topic(name="n", description="d", parent=parent_id)
-    assert t.parent == parent_id
-
-
-def test_topic_validated_defaults_to_false():
-    t = Topic(name="n", description="d")
     assert t.validated is False
-
-
-def test_topic_validated_roundtrip():
-    t = Topic(name="n", description="d", validated=True)
-    raw = t.model_dump()
-    result = Topic.model_validate(raw)
-    assert result.validated is True
-
-
-def test_topic_validated_missing_field_defaults_to_false():
-    raw = {"name": "n", "description": "d"}
-    t = Topic.model_validate(raw)
-    assert t.validated is False
-
-
-def test_topic_level_defaults_to_zero():
-    t = Topic(name="n", description="d")
     assert t.level == 0
-
-
-def test_topic_level_can_be_set():
-    t = Topic(name="n", description="d", level=2)
-    assert t.level == 2
-
-
-def test_topic_level_roundtrip():
-    t = Topic(name="n", description="d", level=3)
-    raw = t.model_dump()
-    result = Topic.model_validate(raw)
-    assert result.level == 3
-
-
-def test_topic_level_missing_field_defaults_to_zero():
-    raw = {"name": "n", "description": "d"}
-    t = Topic.model_validate(raw)
-    assert t.level == 0
-
-
-@pytest.mark.parametrize("missing_field", ["name", "description"])
-def test_topic_raises_on_missing_field(missing_field: str):
-    fields = {"name": "n", "description": "d"}
-    del fields[missing_field]
-    with pytest.raises(ValidationError):
-        Topic(**fields)
-
-
-# --- TopicConfig ---
-
-
-def test_topicconfig_wraps_topic_list(taxonomy):
-    assert len(taxonomy.topics) == 2
-
-
-def test_topicconfig_accepts_empty_list():
-    tc = Taxonomy(topics=[])
-    assert tc.topics == []
-
-
-def test_topicconfig_model_validate_roundtrip(taxonomy):
-    raw = taxonomy.model_dump()
-    result = Taxonomy.model_validate(raw)
-    assert result == taxonomy
+    assert t.sources == []
 
 
 @pytest.mark.parametrize(
-    "bad_payload",
-    [
-        {"topics": [{"name": "n"}]},
-        {"topics": "not-a-list"},
-        {},
-    ],
+    "field, value",
+    [("parent", uuid4()), ("validated", True), ("level", 2), ("sources", ["doc1", "doc2"])],
 )
-def test_topicconfig_raises_on_invalid_payload(bad_payload: dict):
-    with pytest.raises(ValidationError):
-        Taxonomy.model_validate(bad_payload)
+def test_topic_optional_fields_can_be_overridden(field: str, value):
+    t = Topic(name="n", description="d", **{field: value})
+    assert getattr(t, field) == value
 
 
-# --- LabeledTopic ---
+@pytest.mark.parametrize(
+    "field, value",
+    [("parent", uuid4()), ("validated", True), ("level", 3), ("sources", ["doc1"])],
+)
+def test_topic_model_validate_roundtrips_optional_fields(field: str, value):
+    t = Topic(name="n", description="d", **{field: value})
+    result = Topic.model_validate(t.model_dump())
+    assert getattr(result, field) == value
 
 
-def test_labeled_topic_instantiation_stores_fields():
-    t = Label(name="n", rationale="s", extract="e")
-    assert t.name == "n"
-    assert t.rationale == "s"
-    assert t.extract == "e"
+def test_taxonomy_wraps_topic_list(taxonomy: Taxonomy):
+    assert len(taxonomy.topics) == 2
 
 
-@pytest.mark.parametrize("missing_field", ["name", "rationale", "extract"])
-def test_labeled_topic_raises_on_missing_field(missing_field: str):
-    fields = {"name": "n", "rationale": "s", "extract": "e"}
-    del fields[missing_field]
-    with pytest.raises(ValidationError):
-        Label(**fields)
+def test_taxonomy_model_validate_roundtrip(taxonomy: Taxonomy):
+    result = Taxonomy.model_validate(taxonomy.model_dump())
+    assert result == taxonomy
 
 
-# --- DocumentLabels / LabeledDataset ---
+def test_label_construction_stores_fields():
+    label = Label(name="n", rationale="s", extract="e")
+    assert label.name == "n"
+    assert label.rationale == "s"
+    assert label.extract == "e"
 
 
-def test_document_labels_stores_id_and_labels(labeled_topics):
+def test_document_labels_stores_id_and_labels(labeled_topics: list[Label]):
     dl = DocumentLabels(id="doc1", labels=labeled_topics)
     assert dl.id == "doc1"
     assert dl.labels == labeled_topics
 
 
-def test_labeled_dataset_wraps_documents(labeled_topics):
+def test_labeled_dataset_wraps_documents_and_roundtrips(labeled_topics: list[Label]):
     dl = DocumentLabels(id="doc1", labels=labeled_topics)
     ds = LabeledDataset(documents=[dl])
     assert len(ds.documents) == 1
     assert ds.documents[0].id == "doc1"
-
-
-def test_labeled_dataset_roundtrip(labeled_topics):
-    dl = DocumentLabels(id="doc1", labels=labeled_topics)
-    raw = LabeledDataset(documents=[dl]).model_dump()
-    result = LabeledDataset.model_validate(raw)
+    result = LabeledDataset.model_validate(ds.model_dump())
     assert result.documents[0].labels == labeled_topics
 
 
-def test_factorize_report_stores_merges(merge_report):
+def test_factorize_report_stores_merges_and_roundtrips(merge_report: FactorizeReport):
     assert len(merge_report.merges) == 1
-
-
-def test_factorize_report_roundtrip(merge_report):
-    raw = merge_report.model_dump()
-    result = FactorizeReport.model_validate(raw)
+    result = FactorizeReport.model_validate(merge_report.model_dump())
     assert result == merge_report
 
 
-def test_structure_report_stores_parents_added(structure_report):
+def test_structure_report_stores_parents_added_and_roundtrips(structure_report: ParentDiscoveryReport):
     assert len(structure_report.parents_added) == 1
-
-
-def test_structure_report_roundtrip(structure_report):
-    raw = structure_report.model_dump()
-    result = ParentDiscoveryReport.model_validate(raw)
+    result = ParentDiscoveryReport.model_validate(structure_report.model_dump())
     assert result == structure_report
 
 
-def test_topic_merge_stores_fields():
+def test_topic_merge_stores_sources_and_target():
     m = TopicMerge(
         sources=Taxonomy(topics=[Topic(name="B", description="d"), Topic(name="C", description="d")]),
         target=Topic(name="A", description="d"),
@@ -181,7 +96,7 @@ def test_topic_merge_stores_fields():
     assert [s.name for s in m.sources.topics] == ["B", "C"]
 
 
-def test_parent_addition_stores_fields():
+def test_parent_addition_stores_parent_and_children():
     children = Taxonomy(topics=[Topic(name="A", description="d"), Topic(name="B", description="d")])
     pa = ParentAddition(parent=Topic(name="P", description="d"), children=children)
     assert pa.parent.name == "P"

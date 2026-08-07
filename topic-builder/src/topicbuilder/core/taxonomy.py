@@ -57,9 +57,9 @@ class SanityReport:
 
 def sanitize_taxonomy(taxonomy: Taxonomy) -> Taxonomy:
     """
-    Warn on duplicate ids, then apply all four structural fixes in sequence: merge name
-    duplicates, drop topics with a blank name, clear dangling parent references,
-    and clear self-parent references.
+    Warn on duplicate ids, then apply all five structural fixes in sequence: merge name
+    duplicates, drop topics with a blank name, clear dangling parent references, clear
+    self-parent references, and drop meta-topics left grouping no children.
     """
     if duplicate_ids := find_duplicate_ids(taxonomy):
         logger.warning(f"Found {len(duplicate_ids)} duplicate topic id(s): {duplicate_ids}")
@@ -68,6 +68,7 @@ def sanitize_taxonomy(taxonomy: Taxonomy) -> Taxonomy:
     taxonomy = drop_blank_names(taxonomy)
     taxonomy = clear_dangling_parents(taxonomy)
     taxonomy = clear_self_parents(taxonomy)
+    taxonomy = drop_childless_parents(taxonomy)
     return taxonomy
 
 
@@ -77,7 +78,7 @@ def merge_name_duplicates(taxonomy: Taxonomy) -> Taxonomy:
     and level, the first occurrence wins, inheriting a parent from discarded duplicates when the
     survivor has none. Among topics with the same name but different levels, the highest-level
     entry wins. Children whose parent id referred to a discarded duplicate are remapped to the
-    surviving topic's id.
+    surviving topic's id. Source text ids of every topic sharing a name are unioned into the survivor.
     """
     by_key: dict[tuple[str, int], Topic] = {}
     for t in taxonomy.topics:
@@ -94,15 +95,30 @@ def merge_name_duplicates(taxonomy: Taxonomy) -> Taxonomy:
 
     id_remap = {t.id: by_key[(t.name, highest_level[t.name])].id for t in taxonomy.topics}
 
+    merged: dict[str, dict[str, None]] = {}
+    for t in taxonomy.topics:
+        merged.setdefault(t.name, {}).update(dict.fromkeys(t.sources))
+    sources_by_name = {name: list(ids) for name, ids in merged.items()}
+
     seen: set[str] = set()
     topics = [
         (survivor := by_key[(t.name, highest_level[t.name])]).model_copy(
-            update={"parent": id_remap.get(survivor.parent, survivor.parent)}
+            update={
+                "parent": id_remap.get(survivor.parent, survivor.parent),
+                "sources": sources_by_name[t.name],
+            }
         )
         for t in taxonomy.topics
         if t.name not in seen and not seen.add(t.name)
     ]
     return Taxonomy(topics=topics)
+
+
+def filter_taxonomy_by_source(taxonomy: Taxonomy, source_id: str) -> Taxonomy:
+    """
+    Keep only the topics recording `source_id` among the texts they were discovered in.
+    """
+    return Taxonomy(topics=[t for t in taxonomy.topics if source_id in t.sources])
 
 
 def drop_blank_names(taxonomy: Taxonomy) -> Taxonomy:
@@ -140,6 +156,23 @@ def clear_self_parents(taxonomy: Taxonomy) -> Taxonomy:
         logger.warning(f"Removing {len(self_ids)} parent links pointing to self: {self_ids}")
 
     return Taxonomy(topics=[t if t.parent != t.id else t.model_copy(update={"parent": None}) for t in taxonomy.topics])
+
+
+def drop_childless_parents(taxonomy: Taxonomy) -> Taxonomy:
+    """
+    Repeatedly remove level>0 topics no other topic points to as parent, since a meta-topic
+    left grouping nothing no longer serves a purpose. Repeats to fixed point, since dropping
+    one such topic can leave its own parent childless in turn.
+    """
+    topics = taxonomy.topics
+    while True:
+        parent_ids = {t.parent for t in topics} - {None}
+        childless = [t for t in topics if t.level > 0 and t.id not in parent_ids]
+        if not childless:
+            return Taxonomy(topics=topics)
+        logger.warning(f"Removing {len(childless)} childless meta-topic(s): {[t.name for t in childless]}")
+        childless_ids = {t.id for t in childless}
+        topics = [t for t in topics if t.id not in childless_ids]
 
 
 def check_taxonomy(taxonomy: Taxonomy) -> SanityReport:

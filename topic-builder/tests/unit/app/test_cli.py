@@ -1,13 +1,12 @@
+import pytest
+
 from topicbuilder.app.cli import _build_labels_index
 from topicbuilder.core.schemas import DocumentLabels, Label, LabeledDataset
 
 
-def test_build_labels_index_returns_empty_dict_for_none():
-    assert _build_labels_index(None) == {}
-
-
-def test_build_labels_index_returns_empty_dict_when_no_documents():
-    assert _build_labels_index(LabeledDataset(documents=[])) == {}
+@pytest.mark.parametrize("labeled_dataset", [None, LabeledDataset(documents=[])])
+def test_build_labels_index_returns_empty_dict_for_degenerate_input(labeled_dataset: LabeledDataset | None):
+    assert _build_labels_index(labeled_dataset) == {}
 
 
 def test_build_labels_index_groups_labels_by_topic_name_across_documents():

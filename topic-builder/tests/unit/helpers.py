@@ -7,6 +7,13 @@ from topicbuilder.core.clustering import ClusteringConfig
 from topicbuilder.core.schemas import Label, ParentAddition, ParentCandidate, Taxonomy, Topic, TopicMerge
 
 
+def with_sources(taxonomy: Taxonomy, *source_ids: str) -> Taxonomy:
+    """
+    Return a copy of the taxonomy where every topic records the supplied source text ids.
+    """
+    return Taxonomy(topics=[t.model_copy(update={"sources": list(source_ids)}) for t in taxonomy.topics])
+
+
 def make_clustering_config(n_neighbors: int, n_components: int, min_cluster_size: int = 2) -> ClusteringConfig:
     """
     Build a minimal ClusteringConfig for testing clusterize() without loading a config file.
