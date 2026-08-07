@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from cahier_doleances.database.db import get_engine
-from cahier_doleances.database.models import (
+from database.db import get_engine
+from database.models import (
     Annotation,
     Contribution,
     Extraction,

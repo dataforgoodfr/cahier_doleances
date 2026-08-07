@@ -4,9 +4,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from cahier_doleances.database.models import Contribution, Extraction, PageExtraction
-from cahier_doleances.extraction.extract_text import extract_pdf_pages
-from cahier_doleances.extraction.extraction_config import ExtractionConfig
+from database.models import Contribution, PageExtraction
+from extraction.without_ocr.config import ExtractionConfig
+from extraction.without_ocr.extract_text import extract_pdf_pages
 
 
 def test_extract_pages_persists_one_contribution_per_page(engine, pdf_path):
@@ -35,8 +35,9 @@ def test_extract_pages_persists_one_contribution_per_page(engine, pdf_path):
 
         page_extractions = (
             session.execute(
-                select(PageExtraction)
-                .where(PageExtraction.contribution_id.in_(contribution_ids))
+                select(PageExtraction).where(
+                    PageExtraction.contribution_id.in_(contribution_ids)
+                )
             )
             .scalars()
             .all()

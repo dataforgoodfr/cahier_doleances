@@ -10,12 +10,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
-from cahier_doleances.database.db import get_engine
-from cahier_doleances.database.models import Contribution, PageExtraction
-from cahier_doleances.extraction.discovery import list_pdfs, require_path_to_data
-from cahier_doleances.extraction.extract_text import extract_pdf_pages
-from cahier_doleances.settings import logger
-from cahier_doleances.utils.timing import timed
+from database.db import get_engine
+from database.models import Contribution, PageExtraction
+from extraction.without_ocr.discovery import list_pdfs, require_path_to_data
+from extraction.without_ocr.extract_text import extract_pdf_pages
+from extraction.without_ocr.settings import logger
+from extraction.without_ocr.timing import timed
 
 
 @timed
@@ -79,8 +79,12 @@ def main() -> int:
 
             logger.info(f"--- {pdf_path.name} ---")
             logger.info(f"  contributions: {len(contributions)}")
-            logger.info(f"  city: {contributions[0].city if contributions else '(not set)'}")
-            logger.info(f"  pages: {contributions[0].start_page if contributions else '?'}-{contributions[-1].end_page if contributions else '?'}")
+            logger.info(
+                f"  city: {contributions[0].city if contributions else '(not set)'}"
+            )
+            logger.info(
+                f"  pages: {contributions[0].start_page if contributions else '?'}-{contributions[-1].end_page if contributions else '?'}"
+            )
             logger.info(f"  page_extraction_rows: {page_count}")
             logger.info(f"  clean (needs_ocr=False): {clean_count}")
             logger.info(f"  handwritten (needs_ocr=True): {handwritten_count}")

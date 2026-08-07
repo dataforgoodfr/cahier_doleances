@@ -1,42 +1,6 @@
-"""Fixtures for integration tests."""
-
-from collections.abc import Iterator
-from pathlib import Path
+"""Fixtures spécifiques aux tests d'intégration."""
 
 import pytest
-from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session
-
-from cahier_doleances.database.models import Base
-
-
-@pytest.fixture
-def engine() -> Iterator[Engine]:
-    """In-memory SQLite engine with the schema created."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    yield engine
-
-
-@pytest.fixture
-def pdf_path() -> Path:
-    """Path to the reference test PDF."""
-    return Path(__file__).resolve().parent.parent / "data" / "Cahier_citoyen_test.pdf"
-
-
-@pytest.fixture
-def show_db(engine: Engine):
-    """Debug helper that prints every row of the contribution/extraction tables."""
-
-    def _show():
-        with Session(engine) as session:
-            for table in ["contribution", "extraction"]:
-                rows = session.execute(text(f"SELECT * FROM {table}")).fetchall()
-                print(f"\n--- {table} ---")
-                for row in rows:
-                    print(dict(row._mapping))
-
-    return _show
 
 
 @pytest.fixture

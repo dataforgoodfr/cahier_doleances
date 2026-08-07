@@ -1,6 +1,6 @@
 """Unit tests for PDF text extraction (no real PDF file)."""
 
-from cahier_doleances.extraction.extract_text import (
+from extraction.without_ocr.extract_text import (
     clean_page_text,
     needs_ocr_flag,
     wordfreq_quality_score,

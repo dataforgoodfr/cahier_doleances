@@ -7,13 +7,13 @@ import fitz
 from sqlalchemy import Engine
 from wordfreq import zipf_frequency
 
-from cahier_doleances.extraction.extraction_config import (
+from extraction.without_ocr.config import (
     ExtractionConfig,
     city_regex,
 )
-from cahier_doleances.extraction.persist import save_page_extractions
-from cahier_doleances.settings import logger
-from cahier_doleances.utils.timing import timed
+from extraction.without_ocr.persist import save_page_extractions
+from extraction.without_ocr.settings import logger
+from extraction.without_ocr.timing import timed
 
 
 def wordfreq_quality_score(text: str) -> float:

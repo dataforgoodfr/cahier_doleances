@@ -97,42 +97,5 @@ dans un fichier committé.
 uv run alembic revision --autogenerate -m "..." # générer une migration
 uv run alembic upgrade head # appliquer à la base
 uv run alembic current # version actuelle de la base
-uv run python -m cahier_doleances.database.seed_mock # seed de démo : 4 contributions dactylographiées réelles
-```
-
-## Extraction des PDFs
-
-Le module `cahier_doleances/extraction/` permet d'extraire le texte natif contenu dans les PDFs des cahiers de doléances, sans passer par un OCR. Pour chaque fichier PDF :
-
-- les **2 premières pages** sont lues comme des pages de metadata (ville, code INSEE) et ne sont pas persistées en base ;
-- à partir de la page 3, chaque page est extraite, nettoyée et stockée dans la table `page_extraction` ;
-- l'extraction s'arrête dès qu'on rencontre le marqueur `Fin des pages écrites` ;
-- la ville est extraite via une regex sur le texte des pages de metadata et stockée dans `contribution.city` et `page_extraction.city` ;
-- un **score de qualité** (`quality_score`, entre 0 et 1) est calculé avec `wordfreq` pour mesurer la proportion de mots français courants. Si le score est faible, la page est probablement manuscrite ou de mauvaise qualité : elle est alors flagguée `needs_ocr = True` et le champ `contribution.is_handwritten` est mis à jour.
-
-### Pré-requis
-
-1. Renseigner la base de données dans `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`).
-2. Renseigner le dossier contenant les PDFs dans `.env` :
-
-```bash
-PATH_TO_DATA=/chemin/vers/les/pdfs
-```
-
-### Lancer l'extraction
-
-```bash
-# Appliquer les migrations (notamment la nouvelle table page_extraction)
-uv run alembic upgrade head
-
-# Extraire tous les PDFs du dossier PATH_TO_DATA
-uv run python scripts/extract_all_pdfs.py
-```
-
-Le script affiche un récapitulatif final : nombre de PDFs traités, échecs éventuels et identifiants des contributions créées en base.
-
-### Tester l'extraction
-
-```bash
-uv run pytest
+uv run python -m database.seed_mock # seed de démo : 4 contributions dactylographiées réelles
 ```

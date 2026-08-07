@@ -1,6 +1,6 @@
 """Configuration for PDF extraction (business parameters).
 
-Distinct from ``settings.py`` (which holds secrets/connections): this module
+Distinct from ``settings.py`` (which reads the environment): this module
 centralizes parsing rules and quality thresholds as simple enum values.
 """
 
@@ -9,11 +9,7 @@ import re
 
 
 class ExtractionConfig(enum.Enum):
-    """Extraction parameters as simple constants.
-
-    Each value may be a string, int or float; access via ``.value`` or the
-    convenience module-level constants below.
-    """
+    """Extraction parameters as simple constants, accessed via ``.value``."""
 
     # End marker for useful content (parsing stops beyond this page).
     END_MARKER = "Fin des pages écrites"
