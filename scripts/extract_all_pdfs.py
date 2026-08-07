@@ -40,7 +40,7 @@ def main() -> int:
             logger.debug(f"Full path: {pdf_path.resolve()}")
 
             try:
-                contribution_id = extract_pdf_pages(pdf_path)
+                contribution_ids = extract_pdf_pages(pdf_path)
             except Exception as exc:  # noqa: BLE001 - catch any per-PDF failure to keep the batch running
                 logger.warning(
                     f"Failed to extract {pdf_path.name}: {exc}",
@@ -49,33 +49,43 @@ def main() -> int:
                 failed.append(pdf_path.name)
                 continue
 
-            contribution = session.get(Contribution, contribution_id)
-            if contribution is None:
+            if not contribution_ids:
                 logger.warning(
-                    f"Contribution id={contribution_id} not found in DB",
+                    f"No contributions created for {pdf_path.name}",
                     file=sys.stderr,
                 )
                 failed.append(pdf_path.name)
                 continue
 
+            contributions = (
+                session.execute(
+                    select(Contribution).where(Contribution.id.in_(contribution_ids))
+                )
+                .scalars()
+                .all()
+            )
+
             page_count = (
                 session.execute(
                     select(func.count(PageExtraction.id)).where(
-                        PageExtraction.contribution_id == contribution_id
+                        PageExtraction.contribution_id.in_(contribution_ids)
                     )
                 ).scalar()
                 or 0
             )
 
-            logger.info("--- Contribution ---")
-            logger.info(f"  id: {contribution.id}")
-            logger.info(f"  pdf_file: {contribution.pdf_file}")
-            logger.info(f"  city: {contribution.city or '(not set)'}")
-            logger.info(f"  pages: {contribution.start_page}-{contribution.end_page}")
-            logger.info(f"  page_extraction_rows: {page_count}")
-            logger.info(f"  is_handwritten: {contribution.is_handwritten}")
+            handwritten_count = sum(1 for c in contributions if c.is_handwritten)
+            clean_count = len(contributions) - handwritten_count
 
-            succeeded.append(contribution_id)
+            logger.info(f"--- {pdf_path.name} ---")
+            logger.info(f"  contributions: {len(contributions)}")
+            logger.info(f"  city: {contributions[0].city if contributions else '(not set)'}")
+            logger.info(f"  pages: {contributions[0].start_page if contributions else '?'}-{contributions[-1].end_page if contributions else '?'}")
+            logger.info(f"  page_extraction_rows: {page_count}")
+            logger.info(f"  clean (needs_ocr=False): {clean_count}")
+            logger.info(f"  handwritten (needs_ocr=True): {handwritten_count}")
+
+            succeeded.extend(contribution_ids)
 
     logger.info("\n=== Summary ===")
     logger.info(f"  processed: {len(succeeded)}")

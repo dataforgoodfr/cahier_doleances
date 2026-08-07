@@ -119,22 +119,24 @@ def needs_ocr_flag(text: str, wf_score: float) -> bool:
 
 
 @timed
-def extract_pdf_pages(filepath: str | Path, engine: Engine | None = None) -> int:
-    """Extract text page-by-page and persist each page.
+def extract_pdf_pages(filepath: str | Path, engine: Engine | None = None) -> list[int]:
+    """Extract text page-by-page and persist each page as a separate contribution.
 
     Rules:
     - The first ``skip_first_n_pages`` pages are parsed only to extract the
       city name (no PageExtraction row created).
     - From the next page onward, each page is extracted, cleaned, scored and
-      persisted (unless too short = noise).
+      persisted as a separate contribution (unless too short = noise).
     - Parsing stops at the first page containing the end marker (excluded).
+    - For pages with ``needs_ocr=False``, an ``Extraction`` row is also created
+      with the cleaned text.
 
     Args:
         filepath: Path of the PDF to process.
         engine: Optional SQLAlchemy engine (defaults to the global engine).
 
     Returns:
-        The ID of the created/reused ``Contribution``.
+        List of IDs of the created ``Contribution`` rows (one per page).
     """
     filepath = Path(filepath)
     if not filepath.exists():
