@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from database.models import Contribution, PageExtraction
+from database.models import Contribution, Extraction, PageExtraction
 from extraction.without_ocr.config import ExtractionConfig
 from extraction.without_ocr.extract_text import extract_pdf_pages
 
@@ -212,7 +212,7 @@ def test_extraction_created_for_clean_pages_only(engine, pdf_path):
         for e in extractions:
             contrib = session.get(Contribution, e.contribution_id)
             assert contrib.is_handwritten is False
-            assert e.ocr == "pdfplumber"
+            assert e.ocr == "pymupdf"
             assert e.text
             assert e.num_words == len(e.text.split())
             assert e.num_lines == e.text.count("\n") + 1

@@ -48,6 +48,22 @@ stocke dans la table `page_extraction`, et calcule un score de qualité qui perm
 détecter les pages manuscrites. Le détail du pipeline et les commandes sont dans
 [extraction/without_ocr/README.md](extraction/without_ocr/README.md).
 
+### Lancer l'extraction
+
+```bash
+# 1. Renseigner la base de données et le dossier des PDFs dans .env
+#    (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, PATH_TO_DATA)
+# 2. Appliquer les migrations (notamment la table page_extraction)
+uv run alembic upgrade head
+# 3. Extraire tous les PDFs du dossier PATH_TO_DATA
+uv run python -m extraction.without_ocr
+```
+
+Le script parcourt tous les PDFs de `PATH_TO_DATA`, extrait chaque page et la persiste
+en base. Les PDFs déjà extraits sont ignorés (supprimer les rows existants pour
+ré-extraire). À la fin il affiche un récapitulatif : nombre de PDFs traités, échecs
+éventuels et identifiants des contributions créées.
+
 ## Qualité et sécurité du code (pre-commit)
 
 Les hooks [pre-commit](https://pre-commit.com/) tournent à chaque commit, et la CI

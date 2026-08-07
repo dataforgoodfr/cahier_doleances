@@ -6,7 +6,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from database.db import get_engine
-from database.models import Contribution, PageExtraction
+from database.models import Contribution, Extraction, PageExtraction
 from extraction.without_ocr.settings import logger
 
 
