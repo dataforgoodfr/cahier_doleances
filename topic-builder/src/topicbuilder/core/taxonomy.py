@@ -57,9 +57,9 @@ class SanityReport:
 
 def sanitize_taxonomy(taxonomy: Taxonomy) -> Taxonomy:
     """
-    Warn on duplicate ids, then apply all four structural fixes in sequence: merge name
-    duplicates, drop topics with a blank name, clear dangling parent references,
-    and clear self-parent references.
+    Warn on duplicate ids, then apply all five structural fixes in sequence: merge name
+    duplicates, drop topics with a blank name, clear dangling parent references, clear
+    self-parent references, and drop meta-topics left grouping no children.
     """
     if duplicate_ids := find_duplicate_ids(taxonomy):
         logger.warning(f"Found {len(duplicate_ids)} duplicate topic id(s): {duplicate_ids}")
@@ -68,6 +68,7 @@ def sanitize_taxonomy(taxonomy: Taxonomy) -> Taxonomy:
     taxonomy = drop_blank_names(taxonomy)
     taxonomy = clear_dangling_parents(taxonomy)
     taxonomy = clear_self_parents(taxonomy)
+    taxonomy = drop_childless_parents(taxonomy)
     return taxonomy
 
 
@@ -155,6 +156,23 @@ def clear_self_parents(taxonomy: Taxonomy) -> Taxonomy:
         logger.warning(f"Removing {len(self_ids)} parent links pointing to self: {self_ids}")
 
     return Taxonomy(topics=[t if t.parent != t.id else t.model_copy(update={"parent": None}) for t in taxonomy.topics])
+
+
+def drop_childless_parents(taxonomy: Taxonomy) -> Taxonomy:
+    """
+    Repeatedly remove level>0 topics no other topic points to as parent, since a meta-topic
+    left grouping nothing no longer serves a purpose. Repeats to fixed point, since dropping
+    one such topic can leave its own parent childless in turn.
+    """
+    topics = taxonomy.topics
+    while True:
+        parent_ids = {t.parent for t in topics} - {None}
+        childless = [t for t in topics if t.level > 0 and t.id not in parent_ids]
+        if not childless:
+            return Taxonomy(topics=topics)
+        logger.warning(f"Removing {len(childless)} childless meta-topic(s): {[t.name for t in childless]}")
+        childless_ids = {t.id for t in childless}
+        topics = [t for t in topics if t.id not in childless_ids]
 
 
 def check_taxonomy(taxonomy: Taxonomy) -> SanityReport:

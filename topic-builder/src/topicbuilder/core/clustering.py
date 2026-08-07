@@ -242,7 +242,7 @@ def reduce_dimensions(embeddings: np.ndarray, config: ClusteringConfig) -> np.nd
     n = len(embeddings)
     umap_params = {
         **config.umap,
-        "n_components": min(config.umap.get("n_components", 2), max(2, n // 10)),
+        "n_components": min(config.umap.get("n_components", 2), max(2, n // 10), n - 2),
         "n_neighbors": max(2, min(config.umap.get("n_neighbors", 15), n - 1)),
     }
     return umap.UMAP(**umap_params).fit_transform(embeddings)
