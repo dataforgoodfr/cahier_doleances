@@ -16,8 +16,21 @@ dependencies = [
     "jupysql>=0.10.17",
     "matplotlib>=3.10.0",
     "pandas>=2.2.3",
+    "pymupdf>=1.25.0",
     "psycopg2-binary>=2.9.12",
+    "pydantic-settings>=2.7.0",
     "python-dotenv>=1.1.0",
     "requests>=2.32.3",
     "sqlalchemy>=2.0.44",
+    "tqdm>=4.68.0",
+    "wordfreq>=3.1",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "ty"]
+
+[tool.pytest.ini_options]
+# `topic-builder/` est un projet uv autonome (dépendances et lockfile séparés) :
+# il se teste depuis son propre dossier, pas depuis la racine.
+testpaths = ["extraction"]
+pythonpath = ["."]

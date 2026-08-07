@@ -3,9 +3,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.db
 # C extensions
 *.so
+Agent.md
 
 # Distribution / packaging
 bin/
@@ -169,3 +170,4 @@ backups/
 
 # PyCharm
 *.idea
+scripts/generate_test_pdf.py

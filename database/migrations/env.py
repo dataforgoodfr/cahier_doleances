@@ -1,9 +1,7 @@
 from logging.config import fileConfig
 
-from sqlalchemy import create_engine
-from sqlalchemy import pool
-
 from alembic import context
+from sqlalchemy import create_engine, pool
 
 from database.db import get_url
 from database.models import Base
@@ -61,9 +59,7 @@ def run_migrations_online() -> None:
     connectable = create_engine(get_url(), poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

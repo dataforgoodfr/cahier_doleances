@@ -7,6 +7,8 @@ de les parcourir commune par commune et de les annoter (anonymisé, contribution
 ## Organisation
 
 - `database/` : le modèle de données et les migrations qui structurent la base PostgreSQL | [documentation](database/README.md)
+- `extraction/` : les pipelines d'extraction de texte depuis les PDFs
+  - `extraction/without_ocr/` : extraction du texte natif, sans OCR | [documentation](extraction/without_ocr/README.md)
 - `gradio_app/` : l'interface pour parcourir les contributions et les annoter | [documentation](gradio_app/README.md)
 - `topic-builder/` : l'utilitaire de découverte, structuration et annotation des thèmes abordés dans les contributions | [documentation](topic-builder/README.md)
 
@@ -38,6 +40,13 @@ uv run python gradio_app/app.py # lance l'app
 La connexion PostgreSQL est lue depuis `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`,
 `DB_PASSWORD`, `DB_NAME`). Voir [database/README.md](database/README.md) pour le modèle,
 les migrations Alembic et le seed.
+
+## Extraction des PDFs
+
+Le module `extraction/without_ocr/` extrait le texte natif des PDFs page par page, le
+stocke dans la table `page_extraction`, et calcule un score de qualité qui permet de
+détecter les pages manuscrites. Le détail du pipeline et les commandes sont dans
+[extraction/without_ocr/README.md](extraction/without_ocr/README.md).
 
 ## Qualité et sécurité du code (pre-commit)
 
