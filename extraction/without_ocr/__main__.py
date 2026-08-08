@@ -7,6 +7,7 @@ extraction time.
 import sys
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
@@ -16,6 +17,26 @@ from extraction.without_ocr.discovery import list_pdfs, require_path_to_data
 from extraction.without_ocr.extract_text import extract_pdf_pages
 from extraction.without_ocr.settings import logger
 from extraction.without_ocr.timing import timed
+
+
+def _check_db_connection(engine) -> None:
+    """Abort early with a clear message if the database is not reachable."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(select(1))
+    except OperationalError as exc:
+        url = engine.url
+        logger.error(
+            "Impossible de se connecter à la base de données (%s). "
+            "Vérifiez qu'elle est lancée et accessible (host=%s, port=%s, db=%s). "
+            "Erreur : %s",
+            url,
+            url.host,
+            url.port,
+            url.database,
+            exc.orig,
+        )
+        sys.exit(1)
 
 
 @timed
@@ -31,6 +52,7 @@ def main() -> int:
     logger.info(f"Found {len(pdf_paths)} PDF(s) in {data_dir.resolve()}")
 
     engine = get_engine()
+    _check_db_connection(engine)
     failed: list[str] = []
     succeeded: list[int] = []
 
@@ -77,17 +99,17 @@ def main() -> int:
             handwritten_count = sum(1 for c in contributions if c.is_handwritten)
             clean_count = len(contributions) - handwritten_count
 
-            logger.info(f"--- {pdf_path.name} ---")
-            logger.info(f"  contributions: {len(contributions)}")
-            logger.info(
+            logger.debug(f"--- {pdf_path.name} ---")
+            logger.debug(f"  contributions: {len(contributions)}")
+            logger.debug(
                 f"  city: {contributions[0].city if contributions else '(not set)'}"
             )
-            logger.info(
+            logger.debug(
                 f"  pages: {contributions[0].start_page if contributions else '?'}-{contributions[-1].end_page if contributions else '?'}"
             )
-            logger.info(f"  page_extraction_rows: {page_count}")
-            logger.info(f"  clean (needs_ocr=False): {clean_count}")
-            logger.info(f"  handwritten (needs_ocr=True): {handwritten_count}")
+            logger.debug(f"  page_extraction_rows: {page_count}")
+            logger.debug(f"  clean (needs_ocr=False): {clean_count}")
+            logger.debug(f"  handwritten (needs_ocr=True): {handwritten_count}")
 
             succeeded.extend(contribution_ids)
 

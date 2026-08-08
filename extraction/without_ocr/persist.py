@@ -106,7 +106,7 @@ def save_page_extractions(
 
         session.commit()
 
-        logger.info(
+        logger.debug(
             "Persisted %d pages as %d contributions (city=%s)",
             len(pages),
             len(contribution_ids),

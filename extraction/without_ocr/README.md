@@ -20,16 +20,16 @@ Le modèle de données (`contribution`, `page_extraction`) est documenté dans
 
 ## Organisation
 
-| Fichier | Rôle |
-|---|---|
-| `config.py` | paramètres métier de l'extraction (marqueur de fin, seuils, regex ville) |
-| `settings.py` | configuration lue depuis `.env` (`PATH_TO_DATA`, `LOG_LEVEL`) et logger |
-| `discovery.py` | découverte des PDFs dans le dossier de données |
-| `extract_text.py` | extraction, nettoyage et scoring page par page |
-| `persist.py` | écriture en base (`contribution`, `page_extraction`) |
-| `timing.py` | décorateur `@timed` de mesure du temps d'exécution |
-| `__main__.py` | script d'extraction par lot |
-| `tests/` | tests unitaires et d'intégration du module |
+| Fichier           | Rôle                                                                     |
+| ----------------- | ------------------------------------------------------------------------ |
+| `config.py`       | paramètres métier de l'extraction (marqueur de fin, seuils, regex ville) |
+| `settings.py`     | configuration lue depuis `.env` (`PATH_TO_DATA`, `LOG_LEVEL`) et logger  |
+| `discovery.py`    | découverte des PDFs dans le dossier de données                           |
+| `extract_text.py` | extraction, nettoyage et scoring page par page                           |
+| `persist.py`      | écriture en base (`contribution`, `page_extraction`)                     |
+| `timing.py`       | décorateur `@timed` de mesure du temps d'exécution                       |
+| `__main__.py`     | script d'extraction par lot                                              |
+| `tests/`          | tests unitaires et d'intégration du module                               |
 
 ## Pré-requis
 
@@ -40,6 +40,25 @@ Le modèle de données (`contribution`, `page_extraction`) est documenté dans
 ```bash
 PATH_TO_DATA=/chemin/vers/les/pdfs
 ```
+
+3. **Avoir une base de données lancée et accessible**. Le script se connecte
+   dès son démarrage : si la base n'est pas disponible, il s'arrête
+   immédiatement avec un message d'erreur clair indiquant l'hôte, le port et
+   le nom de la base concernés.
+
+   Pour lancer une base PostgreSQL locale en un coup de commande :
+
+   ```bash
+   docker run --name cahier-doleances-db \
+     -e POSTGRES_USER=$DB_USER \
+     -e POSTGRES_PASSWORD=$DB_PASSWORD \
+     -e POSTGRES_DB=$DB_NAME \
+     -p $DB_PORT:5432 \
+     -d postgres:16
+   ```
+
+   Les variables `$DB_USER`, `$DB_PASSWORD`, `$DB_NAME` et `$DB_PORT` doivent
+   correspondre à celles définies dans le `.env`.
 
 ## Lancer l'extraction
 

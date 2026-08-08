@@ -23,7 +23,7 @@ def timed(_func=None):
             t0 = time.perf_counter()
             result = func(*args, **kwargs)
             dt = time.perf_counter() - t0
-            logger.info("%s took %.2fs", func.__name__, dt)
+            logger.debug("%s took %.2fs", func.__name__, dt)
             return result
 
         return wrapper
