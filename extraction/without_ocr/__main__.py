@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from database.db import get_engine
-from database.models import Contribution, PageExtraction
+from database.models import Base, Contribution, PageExtraction
 from extraction.without_ocr.discovery import list_pdfs, require_path_to_data
 from extraction.without_ocr.extract_text import extract_pdf_pages
 from extraction.without_ocr.settings import logger
@@ -53,6 +53,7 @@ def main() -> int:
 
     engine = get_engine()
     _check_db_connection(engine)
+    Base.metadata.create_all(engine)
     failed: list[str] = []
     succeeded: list[int] = []
 
@@ -64,18 +65,12 @@ def main() -> int:
             try:
                 contribution_ids = extract_pdf_pages(pdf_path)
             except Exception as exc:  # noqa: BLE001 - catch any per-PDF failure to keep the batch running
-                logger.warning(
-                    f"Failed to extract {pdf_path.name}: {exc}",
-                    file=sys.stderr,
-                )
+                logger.warning(f"Failed to extract {pdf_path.name}: {exc}")
                 failed.append(pdf_path.name)
                 continue
 
             if not contribution_ids:
-                logger.warning(
-                    f"No contributions created for {pdf_path.name}",
-                    file=sys.stderr,
-                )
+                logger.warning(f"No contributions created for {pdf_path.name}")
                 failed.append(pdf_path.name)
                 continue
 
