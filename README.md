@@ -60,7 +60,6 @@ Deux options pour disposer d'une base :
      -d postgres:16
    ```
 
-
 2. **Base distante du projet** : demander les credentials d'accès à `Ronan Sy`.
 
 ## Extraction des PDFs
@@ -85,6 +84,13 @@ Le script parcourt tous les PDFs de `PATH_TO_DATA`, extrait chaque page et la pe
 en base. Les PDFs déjà extraits sont ignorés (supprimer les rows existants pour
 ré-extraire). À la fin il affiche un récapitulatif : nombre de PDFs traités, échecs
 éventuels et identifiants des contributions créées.
+
+Une fois l'extraction terminée, les contributions sont visibles dans l'app Gradio que
+vous pouvez lancer avec :
+
+```bash
+uv run python gradio_app/app.py
+```
 
 ## Qualité et sécurité du code (pre-commit)
 
