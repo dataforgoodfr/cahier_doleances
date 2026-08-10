@@ -154,8 +154,9 @@ def generate_parent_candidates(
     clustering_config: ClusteringConfig,
 ) -> list[ParentCandidate]:
     """
-    Partition the taxonomy into clusters, ask the model to propose
-    parent candidates per chunk, then dedupe so each child name appears in at most one candidate.
+    Partition the taxonomy into clusters, ask the model to propose parent candidates per chunk,
+    then dedupe so each child name appears in at most one candidate. Singleton clusters are
+    dropped before the LLM call since a lone topic has no sibling to be grouped with.
     """
     if not taxonomy.topics:
         return []
@@ -163,7 +164,10 @@ def generate_parent_candidates(
     # check for duplicate topic names
     display_duplicates(taxonomy)
 
-    chunks = clusterize_taxonomy_by_level(taxonomy, clustering_config)
+    chunks = [c for c in clusterize_taxonomy_by_level(taxonomy, clustering_config) if len(c.topics) >= 2]
+    if not chunks:
+        return []
+
     responses = client(
         inputs=[build_parent_generation_messages(ct, prompt) for ct in chunks],
         tools=[PARENT_GENERATION_TOOL],
@@ -182,7 +186,7 @@ def generate_parent_candidates(
         for c in args.candidates:
             children = [most_similar_topic(ch, chunk) for ch in c.children]
             children = list({t.name: t for t in children if t.name not in attributed}.values())
-            if c.parent and children:
+            if c.parent and len(children) >= 2:
                 attributed.update(t.name for t in children)
                 candidates.append(ParentCandidate(parent=c.parent, children=Taxonomy(topics=children)))
     return candidates

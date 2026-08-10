@@ -41,6 +41,28 @@ La connexion PostgreSQL est lue depuis `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`,
 `DB_PASSWORD`, `DB_NAME`). Voir [database/README.md](database/README.md) pour le modèle,
 les migrations Alembic et le seed.
 
+**Prérequis : une base de données accessible**
+
+Les scripts se connectent à PostgreSQL dès leur démarrage. Si la base n'est pas
+disponible, ils s'arrêtent immédiatement avec un message d'erreur indiquant
+l'hôte, le port et le nom de la base concernés.
+
+Deux options pour disposer d'une base :
+
+1. **Base locale avec Docker** (recommandé pour le développement) :
+
+   ```bash
+   docker run --name cahier-doleances-db \
+     -e POSTGRES_USER=$DB_USER \
+     -e POSTGRES_PASSWORD=$DB_PASSWORD \
+     -e POSTGRES_DB=$DB_NAME \
+     -p $DB_PORT:5432 \
+     -d postgres:16
+   ```
+
+
+2. **Base distante du projet** : demander les credentials d'accès à `Ronan Sy`.
+
 ## Extraction des PDFs
 
 Le module `extraction/without_ocr/` extrait le texte natif des PDFs page par page, le

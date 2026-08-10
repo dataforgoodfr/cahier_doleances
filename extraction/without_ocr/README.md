@@ -34,31 +34,12 @@ Le modèle de données (`contribution`, `page_extraction`) est documenté dans
 ## Pré-requis
 
 1. Renseigner la base de données dans `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`,
-   `DB_PASSWORD`, `DB_NAME`).
+   `DB_PASSWORD`, `DB_NAME`). S'assurer que la base est accessible et que les migrations ont été appliquées.
 2. Renseigner le dossier contenant les PDFs dans `.env` :
 
 ```bash
 PATH_TO_DATA=/chemin/vers/les/pdfs
 ```
-
-3. **Avoir une base de données lancée et accessible**. Le script se connecte
-   dès son démarrage : si la base n'est pas disponible, il s'arrête
-   immédiatement avec un message d'erreur clair indiquant l'hôte, le port et
-   le nom de la base concernés.
-
-   Pour lancer une base PostgreSQL locale en un coup de commande :
-
-   ```bash
-   docker run --name cahier-doleances-db \
-     -e POSTGRES_USER=$DB_USER \
-     -e POSTGRES_PASSWORD=$DB_PASSWORD \
-     -e POSTGRES_DB=$DB_NAME \
-     -p $DB_PORT:5432 \
-     -d postgres:16
-   ```
-
-   Les variables `$DB_USER`, `$DB_PASSWORD`, `$DB_NAME` et `$DB_PORT` doivent
-   correspondre à celles définies dans le `.env`.
 
 ## Lancer l'extraction
 

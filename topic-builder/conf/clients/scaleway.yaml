@@ -1,0 +1,6 @@
+backend: default
+model: qwen36-35b-a3b
+pool_size: 50
+api_key_env_var: SCALEWAY_API_KEY
+endpoint_args:
+  base_url: https://api.scaleway.ai/v1

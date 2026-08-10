@@ -10,7 +10,7 @@ from topicbuilder.core.schemas import (
     Topic,
     TopicMerge,
 )
-from topicbuilder.tasks import discover_parents, factorize, label
+from topicbuilder.tasks import discover_parents, factorize
 
 
 def stub_clusterize_taxonomy_by_level(taxonomy: Taxonomy, config: ClusteringConfig) -> list[Taxonomy]:
@@ -31,7 +31,6 @@ def clustering_config(monkeypatch: pytest.MonkeyPatch) -> ClusteringConfig:
     """
     monkeypatch.setattr(discover_parents, "clusterize_taxonomy_by_level", stub_clusterize_taxonomy_by_level)
     monkeypatch.setattr(factorize, "clusterize_taxonomy_by_level", stub_clusterize_taxonomy_by_level)
-    monkeypatch.setattr(label, "clusterize_taxonomy_by_level", stub_clusterize_taxonomy_by_level)
     return ClusteringConfig.from_config("tests/conf/test_clustering.yaml")
 
 

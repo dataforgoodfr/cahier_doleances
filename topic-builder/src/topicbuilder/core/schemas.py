@@ -5,12 +5,14 @@ from pydantic import BaseModel, Field
 
 class Topic(BaseModel):
     """
-    A topic entry in the config, with an optional parent id for meta-topic grouping.
+    A topic entry in the config, with an optional parent id for meta-topic grouping and the ids
+    of the source texts it was discovered in.
     """
 
     id: UUID = Field(default_factory=uuid4)
     name: str
     description: str
+    sources: list[str] = Field(default_factory=list)
     parent: UUID | None = None
     level: int = 0
     validated: bool = False

@@ -104,8 +104,8 @@ def factorize(
     ),
 ) -> None:
     """
-    Read `taxonomy_path`, merge near-duplicate level-0 topics, and write the cleaned taxonomy
-    and change report. Only level-0 topics are considered; higher-level topics pass through unchanged.
+    Read `taxonomy_path`, merge near-duplicate topics, and write the cleaned taxonomy and change
+    report. Topics are only ever compared against others at the same level.
     """
     # load artifacts
     taxonomy = read_taxonomy(taxonomy_path)
@@ -147,8 +147,9 @@ def generate_merge_candidates(
     clustering_config: ClusteringConfig,
 ) -> list[Taxonomy]:
     """
-    Partition the taxonomy into clusters, ask the model to identify
-    near-duplicate groups per chunk, then dedupe so each topic appears in at most one group.
+    Partition the taxonomy into clusters, ask the model to identify near-duplicate groups per
+    chunk, then dedupe so each topic appears in at most one group. Singleton clusters are dropped
+    before the LLM call since a lone topic can never yield a merge candidate.
     2-step production of candidates for merging:
         - segmentation of the full taxonomy into clusters of similar topics, done without LLM call.
         - segmentation of each cluster into actual candidates using LLM calls.
@@ -159,7 +160,10 @@ def generate_merge_candidates(
     # check for duplicate topic names
     display_duplicates(taxonomy)
 
-    chunks = clusterize_taxonomy_by_level(taxonomy, clustering_config)
+    chunks = [c for c in clusterize_taxonomy_by_level(taxonomy, clustering_config) if len(c.topics) >= 2]
+    if not chunks:
+        return []
+
     responses = client(
         inputs=[build_merge_generation_messages(ct, prompt) for ct in chunks],
         tools=[MERGE_GENERATION_TOOL],

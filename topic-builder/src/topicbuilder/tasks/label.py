@@ -5,15 +5,10 @@ from loguru import logger
 from pydantic import BaseModel
 
 from topicbuilder.core.client import LLMClient, parse_tool_arguments
-from topicbuilder.core.clustering import (
-    ClusteringConfig,
-    chunk_text,
-    clusterize_taxonomy_by_level,
-    most_similar_topic,
-)
+from topicbuilder.core.clustering import chunk_text, most_similar_topic
 from topicbuilder.core.io import read_dataset, read_taxonomy, read_text, write_json
 from topicbuilder.core.schemas import Document, DocumentLabels, Label, LabeledDataset, Taxonomy
-from topicbuilder.core.taxonomy import display_duplicates, sanitize_taxonomy
+from topicbuilder.core.taxonomy import display_duplicates, filter_taxonomy_by_source, sanitize_taxonomy
 
 LABEL_TOOL: dict = {
     "type": "function",
@@ -77,12 +72,6 @@ def label(
         exists=True,
         help="Path to the markdown system prompt file.",
     ),
-    clustering_config_path: Path = typer.Option(
-        Path("conf/clustering/default.yaml"),
-        "--clustering-config-path",
-        exists=True,
-        help="Path to the clustering config YAML.",
-    ),
     output_path: Path = typer.Option(
         ...,
         "--output-path",
@@ -103,7 +92,6 @@ def label(
     taxonomy = read_taxonomy(taxonomy_path)
     client = LLMClient.from_config(llm_config_path)
     prompt = read_text(prompt_path)
-    clustering_config = ClusteringConfig.from_config(clustering_config_path)
 
     # ensure taxonomy is healthy
     taxonomy = sanitize_taxonomy(taxonomy)
@@ -115,7 +103,6 @@ def label(
         client=client,
         prompt=prompt,
         chunk_max_words=chunk_max_words,
-        clustering_config=clustering_config,
     )
 
     # save output artifacts
@@ -130,43 +117,50 @@ def generate_labels(
     client: LLMClient,
     prompt: str,
     chunk_max_words: int,
-    clustering_config: ClusteringConfig,
 ) -> LabeledDataset:
     """
-    Chunk each document's text and the level-0 taxonomy, send all (text chunk x topic chunk) pairs
-    to the LLM concurrently, and return labels grouped by document id.
+    Chunk each document's text and send every chunk to the LLM concurrently, together with the
+    topics recording that document among their sources, then return labels grouped by document id.
     """
     if not taxonomy.topics:
-        return LabeledDataset(documents=[DocumentLabels(id=doc.id, labels=[]) for doc in documents])
+        return empty_labels(documents)
 
     # check for duplicate topic names
     display_duplicates(taxonomy)
 
-    topic_chunks = clusterize_taxonomy_by_level(taxonomy, clustering_config)
-    text_chunks = [(doc, chunk) for doc in documents for chunk in chunk_text(doc.content, chunk_max_words)]
-    triples = [(doc, text_chunk, topic_chunk) for (doc, text_chunk) in text_chunks for topic_chunk in topic_chunks]
-    logger.info(
-        f"{len(documents)} document(s) → {len(text_chunks)} text chunk(s), "
-        f"{len(topic_chunks)} taxonomy chunk(s), {len(triples)} LLM calls total"
-    )
+    # restrict the candidate topics of each document to those discovered in it
+    taxonomy_by_document = {doc.id: filter_taxonomy_by_source(taxonomy, doc.id) for doc in documents}
+    if unmatched := [doc.id for doc in documents if not taxonomy_by_document[doc.id].topics]:
+        logger.warning(f"{len(unmatched)} document(s) are not recorded as source of any topic: {unmatched}")
+
+    pairs = [
+        (doc.id, chunk)
+        for doc in documents
+        if taxonomy_by_document[doc.id].topics
+        for chunk in chunk_text(doc.content, chunk_max_words)
+    ]
+    if not pairs:
+        return empty_labels(documents)
+
+    logger.info(f"{len(documents)} document(s) → {len(pairs)} text chunk(s) to label")
 
     responses = client(
-        inputs=[build_messages(text_chunk, topic_chunk, prompt) for (_, text_chunk, topic_chunk) in triples],
+        inputs=[build_messages(chunk, taxonomy_by_document[doc_id], prompt) for doc_id, chunk in pairs],
         tools=[LABEL_TOOL],
         tool_choice={"type": "function", "function": {"name": "record_labeled_topics"}},
     )
 
     labels: dict[str, list[Label]] = {doc.id: [] for doc in documents}
-    for (doc, _, topic_chunk), response in zip(triples, responses, strict=True):
+    for (doc_id, _), response in zip(pairs, responses, strict=True):
         args = parse_tool_arguments(response, LabelArgs)
         if args is None:
             continue
         for t in args.topics:
             # clean the topic
             if t.name and t.rationale and t.extract:
-                clean_name = most_similar_topic(t.name, topic_chunk).name
+                clean_name = most_similar_topic(t.name, taxonomy_by_document[doc_id]).name
                 clean_label = Label(name=clean_name, rationale=t.rationale, extract=t.extract)
-                labels[doc.id].append(clean_label)
+                labels[doc_id].append(clean_label)
 
     # deduplicate labels by topic name
     labels = {doc_id: list({t.name: t for t in ls}.values()) for doc_id, ls in labels.items()}
@@ -185,3 +179,10 @@ def build_messages(text: str, taxonomy: Taxonomy, prompt: str) -> list[dict]:
         {"role": "system", "content": prompt},
         {"role": "user", "content": user_content},
     ]
+
+
+def empty_labels(documents: list[Document]) -> LabeledDataset:
+    """
+    Build a labeled dataset where every document carries an empty list of labels.
+    """
+    return LabeledDataset(documents=[DocumentLabels(id=doc.id, labels=[]) for doc in documents])

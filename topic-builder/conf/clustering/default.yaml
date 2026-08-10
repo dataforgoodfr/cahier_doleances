@@ -7,7 +7,7 @@ umap:
   n_neighbors: 10
   min_dist: 0.1
   metric: cosine
-  random_state: 42
+  # random_state: 42
 hdbscan:
   max_cluster_size: 50
   min_cluster_size: 2
