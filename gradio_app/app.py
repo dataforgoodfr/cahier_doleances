@@ -22,8 +22,6 @@ with gr.Blocks(title="Cahiers de doléances") as demo:
 
     with gr.Tab("Par commune"):
         load_fn, load_outputs = commune.render()
-    # with gr.Tab("Par topic"):
-    #     topic.render()
 
     demo.load(load_fn, None, load_outputs)
 

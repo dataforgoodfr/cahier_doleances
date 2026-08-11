@@ -6,19 +6,33 @@ from data_helpers import (
     list_contributions,
     save_annotation,
 )
+from s3_helpers import url_pdf
 
 
-def pdf_html(pdf_file: str | None) -> str:
-    if not pdf_file:
-        return "<em>PDF à intégrer.</em>"
-    path = (PDF_DIR / pdf_file).resolve()
-    if not path.exists():
-        return f"<em>PDF introuvable : {pdf_file}</em>"
-    src = f"/gradio_api/file={path}"
+def _cadre(src: str, lien: str) -> str:
     return (
         f'<iframe src="{src}" width="100%" height="640px" '
         'style="border:1px solid #ddd;border-radius:8px;"></iframe>'
+        f'<p style="margin:6px 0 0"><a href="{lien}" target="_blank" '
+        'rel="noopener">Ouvrir le PDF dans un onglet</a></p>'
     )
+
+
+def pdf_html(pdf_file: str | None) -> str:
+    """Le PDF vient de S3 (URL présignée) ; on retombe sur le dossier local
+    si le bucket est injoignable, pour rester utilisable hors ligne."""
+    if not pdf_file:
+        return "<em>PDF à intégrer.</em>"
+
+    url = url_pdf(pdf_file)
+    if url:
+        return _cadre(url, url)
+
+    path = (PDF_DIR / pdf_file).resolve()
+    if path.exists():
+        src = f"/gradio_api/file={path}"
+        return _cadre(src, src)
+    return f"<em>PDF introuvable : {pdf_file}</em>"
 
 def show(commune: str, idx: int):
     """Affiche la contribution n°idx de la commune."""
