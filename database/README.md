@@ -115,20 +115,11 @@ ne produit que du bruit dans les diffs et des conflits de merge.
 La connexion est construite par `database/db.py` depuis `.env` (ou `DATABASE_URL`
 pour un SQLite local) — jamais de credentials dans un fichier committé.
 
-## Charger la livraison de l'équipe analyse
+## Charger la livraison de l'équipe analyse (temporaire TODO: mettre dans une future pipeline)
 
 `database/load_analysis.py` lit `analyse/analysis_v4/` (`taxonomy.json` +
-`instances.json`) et remplit `topic` et `instance`. Idempotent : les topics sont
-synchronisés par `external_id` (un référentiel ne se vide pas), les instances
-sont remplacées à chaque exécution. Il est important de récupérer ce script dans la future data pipeline.
+`instances.json`) et remplit `topic` et `instance`. Il est important de récupérer ce script dans la future data pipeline.
 
-Deux points à connaître :
-
-- La livraison contient des **caractères NUL** que PostgreSQL refuse en `text` ;
-  ils sont retirés au chargement, des deux côtés de la jointure par nom.
-- Le rapprochement document → contribution n'est pas résolu (3441 contributions
-  pour 1524 documents livrés). `contribution_id` reste NULL, l'identifiant source
-  est conservé dans `external_doc_id` pour pouvoir faire le lien plus tard.
 
 ## Commandes
 

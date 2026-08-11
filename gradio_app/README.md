@@ -57,8 +57,6 @@ Scaleway : certains PDF font 43 Mo, ils ne transitent pas par l'app. Repli sur
    - PDF : `S3_ENDPOINT`, `S3_BUCKET_NAME`, `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`
      (`S3_REGION` est déduite de l'endpoint si elle n'est pas renseignée)
 
-Sans les variables S3, tout fonctionne sauf l'aperçu PDF.
-
 ## Lancer
 
 ```bash
