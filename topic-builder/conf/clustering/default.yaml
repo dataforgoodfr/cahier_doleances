@@ -1,0 +1,17 @@
+embedding:
+  model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2  # BAAI/bge-m3
+  batch_size: 32
+  prefix: ""
+umap:
+  n_components: 50
+  n_neighbors: 10
+  min_dist: 0.1
+  metric: cosine
+  # random_state: 42
+hdbscan:
+  max_cluster_size: 50
+  min_cluster_size: 2
+  min_samples: 2
+  cluster_selection_epsilon: 0.05
+  metric: euclidean
+  cluster_selection_method: eom

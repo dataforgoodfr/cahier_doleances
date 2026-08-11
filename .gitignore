@@ -3,9 +3,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.db
 # C extensions
 *.so
+Agent.md
 
 # Distribution / packaging
 bin/
@@ -163,9 +164,18 @@ cython_debug/
 .ruff_cache
 
 # Données des cahiers (sous NDA) + dataset dérivé : jamais committées
-data/
+/data
 .DS_Store
 backups/
 analysis_v3.zip
 analysis_v3/
 analysis_v4/
+analyse/data/
+analyse/__pycache__/
+
+# Sauvegardes locales : ne jamais committer
+temp_safe/
+
+# PyCharm
+*.idea
+scripts/generate_test_pdf.py

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cahier_doleances"
 version = "0.1.0"
@@ -18,8 +22,24 @@ dependencies = [
     "networkx>=3.6.1",
     "pandas>=2.2.3",
     "plotly>=6.9.0",
+    "pymupdf>=1.25.0",
     "psycopg2-binary>=2.9.12",
+    "pydantic-settings>=2.7.0",
     "python-dotenv>=1.1.0",
     "requests>=2.32.3",
     "sqlalchemy>=2.0.44",
+    "tqdm>=4.68.0",
+    "wordfreq>=3.1",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "ty"]
+
+[tool.setuptools.packages.find]
+include = ["database*", "extraction*", "gradio_app*"]
+
+[tool.pytest.ini_options]
+# `topic-builder/` est un projet uv autonome (dépendances et lockfile séparés) :
+# il se teste depuis son propre dossier, pas depuis la racine.
+testpaths = ["extraction"]
+pythonpath = ["."]

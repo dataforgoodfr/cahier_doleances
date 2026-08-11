@@ -52,8 +52,9 @@ erDiagram
 
 | Table | Contenu | Owner |
 |---|---|---|
-| `contribution` | métadonnées : commune, fichier, pages | équipe séparation |
+| `contribution` | métadonnées : commune, fichier, pages, manuscrit | équipe séparation |
 | `extraction` | texte extrait une ligne par essai d'OCR | équipe extraction |
+| `page_extraction` | texte extrait page par page (OCR-free) avec score de qualité et flag `needs_ocr` | équipe extraction |
 | `topic` | taxonomie des thèmes (graphe via `parent`), prédéfinie pour l'extraction zero-shot | équipe analyse |
 | `instance` | détections de thèmes : verbatim + résumé, une ligne par détection | équipe analyse |
 | `feeling` | sentiments détectés : une ligne par résultat | équipe analyse |

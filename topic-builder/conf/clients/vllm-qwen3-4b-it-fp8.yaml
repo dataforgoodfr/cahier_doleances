@@ -1,0 +1,6 @@
+backend: default
+model: Qwen/Qwen3-4B-Instruct-2507-FP8
+pool_size: 12
+api_key_env_var:
+endpoint_args:
+  base_url: http://localhost:8000/v1
