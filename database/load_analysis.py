@@ -1,17 +1,3 @@
-"""Charge la livraison de l'équipe analyse (taxonomy + instances) en base.
-
-Idempotent : rejouable sans dupliquer. `topic` est un référentiel, il se
-synchronise par `external_id` (upsert) et ne se vide jamais. Les `instance`
-sont en revanche remplacées à chaque exécution : elles dépendent entièrement
-de la livraison, et rien d'autre ne les alimente aujourd'hui.
-
-Le rapprochement document -> contribution n'est pas résolu (3441 contributions
-en base pour 1524 documents livrés) : `contribution_id` reste NULL et l'id
-source est conservé dans `external_doc_id` pour pouvoir le faire plus tard.
-
-Lancer :  uv run python -m database.load_analysis [chemin/vers/analysis_v4]
-"""
-
 import json
 import sys
 from pathlib import Path

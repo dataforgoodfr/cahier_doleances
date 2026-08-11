@@ -120,7 +120,7 @@ pour un SQLite local) — jamais de credentials dans un fichier committé.
 `database/load_analysis.py` lit `analyse/analysis_v4/` (`taxonomy.json` +
 `instances.json`) et remplit `topic` et `instance`. Idempotent : les topics sont
 synchronisés par `external_id` (un référentiel ne se vide pas), les instances
-sont remplacées à chaque exécution.
+sont remplacées à chaque exécution. Il est important de récupérer ce script dans la future data pipeline.
 
 Deux points à connaître :
 
@@ -141,11 +141,29 @@ uv run python -m database.seed_mock # seed de démo : 4 contributions dactylogra
 uv run python -m database.load_analysis # charger la livraison analyse
 ```
 
-Dump avant toute évolution destructive (les dumps existants sont dans `backups/`) :
+## Dumps
+
+Format custom `pg_dump`, nommés `<base>_<date>[_<étape>].dump`. Ils contiennent
+`alembic_version`, donc la version de schéma voyage avec les données.
+
+- **En local** : `database/backups/` (ignoré par git, les dumps contiennent le
+  texte des cahiers).
+- **Sur S3** : bucket `cahiers-upload`, préfixe `backups/`. Le script
+  `gradio_app/s3_helpers.py` ne lit que les `.pdf`, un dump n'interfère donc pas
+  avec l'aperçu PDF.
+
+Dump avant toute évolution destructive :
 
 ```bash
 set -a; . ./.env; set +a
 PGPASSWORD="$DB_PASSWORD" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
   --format=custom --no-owner --no-privileges \
   --file="database/backups/${DB_NAME}_$(date +%F).dump"
+```
+
+Restaurer :
+
+```bash
+PGPASSWORD="$DB_PASSWORD" pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+  --clean --if-exists --no-owner database/backups/<fichier>.dump
 ```
