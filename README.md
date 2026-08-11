@@ -41,12 +41,56 @@ La connexion PostgreSQL est lue depuis `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`,
 `DB_PASSWORD`, `DB_NAME`). Voir [database/README.md](database/README.md) pour le modèle,
 les migrations Alembic et le seed.
 
+**Prérequis : une base de données accessible**
+
+Les scripts se connectent à PostgreSQL dès leur démarrage. Si la base n'est pas
+disponible, ils s'arrêtent immédiatement avec un message d'erreur indiquant
+l'hôte, le port et le nom de la base concernés.
+
+Deux options pour disposer d'une base :
+
+1. **Base locale avec Docker** (recommandé pour le développement) :
+
+   ```bash
+   docker run --name cahier-doleances-db \
+     -e POSTGRES_USER=$DB_USER \
+     -e POSTGRES_PASSWORD=$DB_PASSWORD \
+     -e POSTGRES_DB=$DB_NAME \
+     -p $DB_PORT:5432 \
+     -d postgres:16
+   ```
+
+2. **Base distante du projet** : demander les credentials d'accès à `Ronan Sy`.
+
 ## Extraction des PDFs
 
 Le module `extraction/without_ocr/` extrait le texte natif des PDFs page par page, le
 stocke dans la table `page_extraction`, et calcule un score de qualité qui permet de
 détecter les pages manuscrites. Le détail du pipeline et les commandes sont dans
 [extraction/without_ocr/README.md](extraction/without_ocr/README.md).
+
+### Lancer l'extraction
+
+```bash
+# 1. Renseigner la base de données et le dossier des PDFs dans .env
+#    (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, PATH_TO_DATA)
+# 2. Appliquer les migrations (notamment la table page_extraction)
+uv run alembic upgrade head
+# 3. Extraire tous les PDFs du dossier PATH_TO_DATA
+uv run python -m extraction.without_ocr
+```
+
+Le script parcourt tous les PDFs de `PATH_TO_DATA`, extrait chaque page et la persiste
+en base. Les PDFs déjà extraits sont ignorés (supprimer les rows existants pour
+ré-extraire). À la fin il affiche un récapitulatif : nombre de PDFs traités, échecs
+éventuels et identifiants des contributions créées.
+
+Une fois l'extraction terminée, les contributions sont visibles dans l'app Gradio que
+vous pouvez lancer avec :
+
+```bash
+uv run python gradio_app/app.py
+```
 
 ## Qualité et sécurité du code (pre-commit)
 

@@ -20,21 +20,21 @@ Le modèle de données (`contribution`, `page_extraction`) est documenté dans
 
 ## Organisation
 
-| Fichier | Rôle |
-|---|---|
-| `config.py` | paramètres métier de l'extraction (marqueur de fin, seuils, regex ville) |
-| `settings.py` | configuration lue depuis `.env` (`PATH_TO_DATA`, `LOG_LEVEL`) et logger |
-| `discovery.py` | découverte des PDFs dans le dossier de données |
-| `extract_text.py` | extraction, nettoyage et scoring page par page |
-| `persist.py` | écriture en base (`contribution`, `page_extraction`) |
-| `timing.py` | décorateur `@timed` de mesure du temps d'exécution |
-| `__main__.py` | script d'extraction par lot |
-| `tests/` | tests unitaires et d'intégration du module |
+| Fichier           | Rôle                                                                     |
+| ----------------- | ------------------------------------------------------------------------ |
+| `config.py`       | paramètres métier de l'extraction (marqueur de fin, seuils, regex ville) |
+| `settings.py`     | configuration lue depuis `.env` (`PATH_TO_DATA`, `LOG_LEVEL`) et logger  |
+| `discovery.py`    | découverte des PDFs dans le dossier de données                           |
+| `extract_text.py` | extraction, nettoyage et scoring page par page                           |
+| `persist.py`      | écriture en base (`contribution`, `page_extraction`)                     |
+| `timing.py`       | décorateur `@timed` de mesure du temps d'exécution                       |
+| `__main__.py`     | script d'extraction par lot                                              |
+| `tests/`          | tests unitaires et d'intégration du module                               |
 
 ## Pré-requis
 
 1. Renseigner la base de données dans `.env` (`DB_HOST`, `DB_PORT`, `DB_USER`,
-   `DB_PASSWORD`, `DB_NAME`).
+   `DB_PASSWORD`, `DB_NAME`). S'assurer que la base est accessible et que les migrations ont été appliquées.
 2. Renseigner le dossier contenant les PDFs dans `.env` :
 
 ```bash

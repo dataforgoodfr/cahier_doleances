@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cahier_doleances"
 version = "0.1.0"
@@ -28,6 +32,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "ty"]
+
+[tool.setuptools.packages.find]
+include = ["database*", "extraction*", "gradio_app*"]
 
 [tool.pytest.ini_options]
 # `topic-builder/` est un projet uv autonome (dépendances et lockfile séparés) :

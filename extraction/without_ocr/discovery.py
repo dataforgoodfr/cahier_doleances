@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from extraction.without_ocr.settings import logger, settings
+from extraction.without_ocr.settings import settings
 
 
 def _natural_sort_key(path: Path) -> list[str | int]:
@@ -40,7 +40,6 @@ def list_pdfs(path: str | Path) -> list[Path]:
     if not pdfs:
         raise ValueError(f"No PDF found in {p}")
 
-    logger.info("Found %d PDF(s) in %s", len(pdfs), p)
     return pdfs
 
 
