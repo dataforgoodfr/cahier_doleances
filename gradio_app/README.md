@@ -28,6 +28,16 @@ Aucune écriture depuis cette vue. Voir `database/README.md` pour le modèle.
 | `views/style.css` | styles des vues custom (classes `tv-*`), chargé via `css_paths` |
 | `data_helpers.py` | requêtes SQL (SQLAlchemy + pandas) et sauvegarde des annotations |
 
+
+Deux interfaces sur un seul serveur :
+
+    /          les onglets Gradio (par commune, par topic)
+    /graphe    la vue graphe des thèmes, page maison
+
+Le graphe ne peut pas être un onglet Gradio : `gr.Plot` n'expose pas
+d'évènement de clic, or on veut naviguer en cliquant les nœuds. On sert donc
+notre propre page, et le Blocks est monté sur la même FastAPI.
+
 ## Prérequis
 
 1. Base accessible et remplie  via `uv run python -m database.seed_mock` (démo) ou le pipeline data.

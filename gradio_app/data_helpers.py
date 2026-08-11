@@ -24,7 +24,13 @@ engine = create_engine(
 )
 
 def list_communes() -> list[str]:
-    q = text("SELECT DISTINCT city FROM contribution ORDER BY city")
+    # la commune est parsée du PDF : elle est vide quand l'extraction a échoué.
+    # On les écarte, sinon la vue s'ouvre sur une commune sans nom.
+    q = text("""
+        SELECT DISTINCT city FROM contribution
+        WHERE city IS NOT NULL AND btrim(city) <> ''
+        ORDER BY city
+    """)
     return pd.read_sql(q, engine)["city"].tolist()
 
 def ref_topic_counts() -> pd.DataFrame:
@@ -190,3 +196,29 @@ def save_annotation(commune: str, idx: int, is_anonymized: bool, is_of_interest:
              "of_interest": is_of_interest},
         )
     return f"Enregistré (contribution {idx + 1})."
+
+
+#  vue graphe : la taxonomie et ses détections, lues une fois au démarrage
+def charger_taxonomie() -> pd.DataFrame:
+    """Tous les topics avec leur parent résolu par nom (les noms sont uniques)."""
+    q = text("""
+        SELECT t.id, t.external_id, t.name, t.description, t.level, p.name AS parent_nom
+        FROM topic t
+        LEFT JOIN topic p ON p.id = t.parent_id
+    """)
+    return pd.read_sql(q, engine)
+
+
+def charger_detections() -> pd.DataFrame:
+    """Les instances, rattachées au nom de leur topic.
+
+    `external_doc_id` est l'identifiant du document dans la livraison analyse :
+    le rapprochement avec `contribution` n'est pas résolu, on affiche cet id tel quel.
+    """
+    q = text("""
+        SELECT t.name AS topic, i.verbatim, i.summary, i.external_doc_id
+        FROM instance i
+        JOIN topic t ON t.id = i.topic_id
+        ORDER BY i.id
+    """)
+    return pd.read_sql(q, engine)
