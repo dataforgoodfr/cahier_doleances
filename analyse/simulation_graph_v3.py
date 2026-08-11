@@ -16,20 +16,25 @@ import gradio as gr
 RADIUS = 2 # profondeur du voisinage affiché autour du focus
 CAP = 45 # plafond de nœuds dans le voisinage
 APERCU_CAP = 260  # plafond de nœuds dans la vue d'ensemble
+APERCU_ARBRES = 20  # plafond d'arbres dans la vue d'ensemble (v4 en compte 185)
 
 BASE = Path(__file__).parent
-DATA = BASE / "analysis_v3"
+DATA = BASE / "analysis_v4"
+CORPUS = BASE / "analysis_v3" / "dataset.csv"   # corpus non livré en v4
 STATIC = BASE / "static"
 
 
 # --- 1. données ---
-topics = json.loads((DATA / "structure/taxonomy_32.json").read_text())["topics"]
-docs = json.loads((DATA / "label/instances.json").read_text())["documents"]
-df = pd.read_csv(DATA / "dataset.csv")
+topics = json.loads((DATA / "taxonomy.json").read_text())["topics"]
+docs = json.loads((DATA / "instances.json").read_text())["documents"]
 
 by_id = {t["id"]: t for t in topics}
-by_name = {t["name"]: t for t in topics}   # noms uniques en v3
-content = {str(r.id): r.content for r in df.itertuples()}
+by_name = {t["name"]: t for t in topics}   # noms uniques en v4
+
+# v4 ne livre pas le corpus ; on réutilise celui de v3, mêmes documents 0..1523.
+# Il ne sert qu'à distinguer un verbatim littéral d'une reformulation.
+content = ({str(r.id): r.content for r in pd.read_csv(CORPUS).itertuples()}
+           if CORPUS.exists() else {})
 
 occ = defaultdict(list)
 for d in docs:
@@ -38,7 +43,7 @@ for d in docs:
 own = {n: len(v) for n, v in occ.items()}
 TOTAL_INST = sum(own.values())
 
-# le parent est un UUID en v3 --> on le résout vers le nom
+# le parent est un UUID --> on le résout vers le nom
 parent_nom = {t["name"]: (by_id[t["parent"]]["name"] if t["parent"] in by_id else None)
               for t in topics}
 
@@ -321,8 +326,15 @@ def _mise_en_page(fig, hauteur, egaliser):
     return fig
 
 
+def _racines_apercu(strate):
+    """Les arbres montrés dans l'aperçu : les plus gros d'abord. Au-delà d'une
+    vingtaine, le layout radial devient un anneau illisible ; le reste de la
+    strate reste accessible par le sélecteur."""
+    return RACINES_STRATE[strate][:APERCU_ARBRES]
+
+
 def figure_apercu(strate):
-    keep, lien = _squelette(PROF_APERCU[strate], RACINES_STRATE[strate])
+    keep, lien = _squelette(PROF_APERCU[strate], _racines_apercu(strate))
     pos = _layout_foret(keep, lien)
     noms = list(keep)
     seuil = sorted((_rec(n) for n in noms), reverse=True)[:22][-1] if len(noms) > 22 else 0
@@ -416,7 +428,8 @@ def _html_apercu(strate):
     total = sum(_rec(r) for r in ROOTS)
     dets = sum(_rec(r) for r in rs)
     hs = sorted({HAUTEUR[r] for r in rs})
-    keep, _ = _squelette(PROF_APERCU[strate], rs)
+    montres = _racines_apercu(strate)
+    keep, _ = _squelette(PROF_APERCU[strate], montres)
 
     lignes = []
     for cle, lib, _test, _part in STRATES:
@@ -431,8 +444,9 @@ def _html_apercu(strate):
         f"<h3>Strate {strate} · {LIBELLE_STRATE[strate]}</h3>"
         f"<p><b>{len(rs)} arbres · {dets} détections</b> "
         f"({round(100 * dets / total)} % du signal) · hauteur {hs[0]}–{hs[-1]}</p>"
-        f"<p class='meta'>Aperçu : les <b>{PROF_APERCU[strate] + 1} premiers crans</b> sous la "
-        f"racine ({len(keep)} nœuds) ; le reste apparaît en descendant.</p>"
+        f"<p class='meta'>Aperçu : les <b>{len(montres)} arbres les plus gros</b> sur {len(rs)}, "
+        f"jusqu'au cran {PROF_APERCU[strate]} sous la racine ({len(keep)} nœuds). "
+        f"Les autres restent accessibles par le sélecteur.</p>"
         "<table><thead><tr><th>Strate</th><th>Hauteur</th><th>Arbres</th><th>Signal</th></tr>"
         "</thead><tbody>" + "".join(lignes) + "</tbody></table>"
         "<p class='meta'><b>Taille</b> = détections. <b>Couleur</b> = distance à la racine : "
