@@ -1,0 +1,169 @@
+:root {
+  --bord: #e5e7eb;
+  --encre: #111827;
+  --gris: #6b7280;
+  --fond: #f8fafc;
+  --accent: #4f46e5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--encre);
+  background: var(--fond);
+}
+
+/* ---------------------------------------------------------- en-tête */
+header {
+  padding: 14px 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--bord);
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* la ligne de sélecteurs : palier, racine, puis un par cran du chemin */
+#barre {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.champ {
+  display: flex;
+  flex: 1;
+  min-width: 150px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.champ label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+select {
+  max-width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--bord);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 13px;
+}
+
+#etat {
+  margin: 0;
+  padding: 8px 18px 10px;
+  font-size: 12px;
+  color: var(--gris);
+}
+
+/* ------------------------------------------------- graphe et panneau */
+main {
+  display: flex;
+  gap: 16px;
+  padding: 0 16px 16px;
+  align-items: flex-start;
+}
+
+#graphe {
+  flex: 2;
+  min-width: 0;              /* sans ça le flex refuse de rétrécir sous Plotly */
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+}
+
+#panneau {
+  flex: 1;
+  max-height: 88vh;
+  padding: 16px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+}
+
+#panneau h3 { margin: 0 0 10px; font-size: 17px; }
+#panneau h4 { margin: 18px 0 8px; font-size: 14px; }
+
+.meta {
+  color: var(--gris);
+  font-size: 13px;
+}
+
+/* --------------------------------------------------------- verbatims */
+blockquote {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  background: #f5f3ff;
+  border-left: 3px solid #c7d2fe;
+  border-radius: 0 7px 7px 0;
+  font-size: 13px;
+}
+
+blockquote footer {
+  margin-top: 6px;
+  color: var(--gris);
+  font-size: 12px;
+}
+
+/* ------------------------------------------- tableau des paliers */
+table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+th, td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--bord);
+}
+
+th {
+  color: var(--gris);
+  font-weight: 600;
+}
+
+tr.ici {
+  background: #eef2ff;
+  font-weight: 600;
+}
+
+/* --- navigation vers la vue tableau (/) --- */
+.nav {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.nav h1 { margin: 0; }
+
+.nav-lien {
+  padding: 7px 14px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-lien:hover { background: #eef2ff; border-color: #c7d2fe; }

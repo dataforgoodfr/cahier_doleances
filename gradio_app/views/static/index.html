@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cahiers de doléances — vue topic</title>
+  <link rel="stylesheet" href="/graphe/style.css">
+  <script src="/graphe/plotly.js"></script>
+</head>
+<body>
+  <header>
+    <div class="nav">
+      <h1>Cahiers de doléances — vue graphe</h1>
+      <a class="nav-lien" href="/">← Contributions par commune</a>
+    </div>
+    <!-- rempli par app.js : palier, racine, puis un sélecteur par cran du chemin -->
+    <div id="barre"></div>
+  </header>
+
+  <p id="etat">Chargement…</p>
+
+  <main>
+    <div id="graphe"></div>
+    <aside id="panneau"></aside>
+  </main>
+
+  <script src="/graphe/app.js"></script>
+</body>
+</html>

@@ -12,6 +12,18 @@ from database.models import (
 
 OCR = "mock_data_ocr"
 
+# Taxonomie mock : enfant -> parent. Les parents sont des racines (parent NULL).
+# Remplaçable par la hiérarchie officielle de l'équipe analyse, sans migration.
+TAXONOMY = {
+    "fiscalité": "économie",
+    "pouvoir d'achat": "économie",
+    "dépenses publiques": "économie",
+    "logement": "cadre de vie",
+    "agriculture": "cadre de vie",
+    "éducation": "services publics",
+    "démocratie": "institutions",
+}
+
 MOCK = [
     {
         "city": "Trizay",
@@ -215,15 +227,19 @@ def main():
         if session.query(Contribution).first():
             raise SystemExit("La base contient déjà des contributions : abandon.")
 
-        # référentiel : un nom unique par thème (remplaçable par la liste
-        # officielle de l'équipe analyse, sans migration) ; parent reste NULL,
-        # la hiérarchie de la taxonomie sera fournie par l'équipe analyse
+        # référentiel : d'abord les racines (parent NULL), puis les thèmes
+        # feuilles rattachés à leur parent via TAXONOMY
         names = sorted({t["name"] for entry in MOCK for t in entry["topics"]})
         refs = {}
-        for name in names:
+        for name in sorted(set(TAXONOMY.values())):
             ref = Topic(name=name)
             session.add(ref)
             session.flush()  # récupère l'id auto-généré
+            refs[name] = ref.id
+        for name in names:
+            ref = Topic(name=name, parent=TAXONOMY.get(name))
+            session.add(ref)
+            session.flush()
             refs[name] = ref.id
 
         for entry in MOCK:

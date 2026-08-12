@@ -49,13 +49,19 @@ class PageExtraction(Base):
     city = Column(String)  # ville extraite
 
 
-# Table de référence TODO: demander pour compléter ceci avec les datas
+# Référentiel des thèmes, alimenté depuis la livraison de l'équipe analyse.
 class Topic(Base):
     __tablename__ = "topic"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String)  # TODO: précision élément à compléter
-    parent = Column(Text)
+    # UUID de la livraison : clé de rapprochement pour recharger sans dupliquer
+    external_id = Column(String, unique=True)
+    name = Column(String)
+    description = Column(Text)
+    level = Column(Integer)  # rang d'abstraction fourni par l'équipe analyse
+    validated = Column(Boolean)  # relecture humaine du thème
+    parent_id = Column(Integer, ForeignKey("topic.id"))  # hiérarchie
+    parent = Column(Text)  # ancien parent par nom, remplacé par parent_id
 
 
 class Instance(Base):
@@ -63,6 +69,9 @@ class Instance(Base):
 
     id = Column(Integer, primary_key=True)
     contribution_id = Column(Integer, ForeignKey("contribution.id"))
+    # id du document dans la livraison analyse ; le rapprochement avec
+    # contribution reste à faire, on conserve la clé source en attendant
+    external_doc_id = Column(String)
     topic_id = Column(Integer, ForeignKey("topic.id"))
     verbatim = Column(Text)
     summary = Column(Text)

@@ -24,43 +24,17 @@ engine = create_engine(
 )
 
 def list_communes() -> list[str]:
-    q = text("SELECT DISTINCT city FROM contribution ORDER BY city")
+    # la commune est parsée du PDF : elle est vide quand l'extraction a échoué.
+    q = text("""
+        SELECT DISTINCT city FROM contribution
+        WHERE city IS NOT NULL AND btrim(city) <> ''
+        ORDER BY city
+    """)
     return pd.read_sql(q, engine)["city"].tolist()
 
-def ref_topic_counts() -> pd.DataFrame:
-    """Nom + nombre d'instances par thème (dropdown et panneau de répartition)."""
-    # LEFT JOIN : un thème sans instance reste visible (taxonomie ≠ avancement)
-    q = text("""
-        SELECT r.name, count(t.id) AS n
-        FROM topic r
-        LEFT JOIN instance t ON t.topic_id = r.id
-        GROUP BY r.name
-        ORDER BY r.name
-    """)
-    return pd.read_sql(q, engine)
 
-def list_ref_topics() -> list[str]:
-    """Libellés du dropdown thème : 'fiscalité (4)'."""
-    return [f"{r.name} ({r.n})" for r in ref_topic_counts().itertuples()]
 
-def topic_rows(name: str) -> pd.DataFrame:
-    """Les instances d'un thème, jointes à leur contribution (vue 'Par thème')."""
-    q = text("""
-        SELECT k.city, k.pdf_file,
-               (SELECT count(*) FROM contribution k2
-                 WHERE k2.city = k.city AND k2.id <= k.id) AS pos,
-               (SELECT count(*) FROM contribution k3
-                 WHERE k3.city = k.city) AS total,
-               (SELECT string_agg(name, ', ') FROM feeling
-                 WHERE contribution_id = k.id) AS feelings,
-               t.verbatim, t.summary, t.contribution_id
-        FROM instance t
-        JOIN topic r ON r.id = t.topic_id
-        JOIN contribution k ON k.id = t.contribution_id
-        WHERE r.name = :name
-        ORDER BY k.city, k.id, t.id
-    """)
-    return pd.read_sql(q, engine, params={"name": name})
+
 
 def _rows(commune: str) -> pd.DataFrame:
     """Les contributions d'une commune."""
@@ -179,3 +153,29 @@ def save_annotation(commune: str, idx: int, is_anonymized: bool, is_of_interest:
              "of_interest": is_of_interest},
         )
     return f"Enregistré (contribution {idx + 1})."
+
+
+#  vue graphe : la taxonomie et ses détections, lues une fois au démarrage
+def charger_taxonomie() -> pd.DataFrame:
+    """Tous les topics avec leur parent résolu par nom (les noms sont uniques)."""
+    q = text("""
+        SELECT t.id, t.external_id, t.name, t.description, t.level, p.name AS parent_nom
+        FROM topic t
+        LEFT JOIN topic p ON p.id = t.parent_id
+    """)
+    return pd.read_sql(q, engine)
+
+
+def charger_detections() -> pd.DataFrame:
+    """Les instances, rattachées au nom de leur topic.
+
+    `external_doc_id` est l'identifiant du document dans la livraison analyse :
+    le rapprochement avec `contribution` n'est pas résolu, on affiche cet id tel quel.
+    """
+    q = text("""
+        SELECT t.name AS topic, i.verbatim, i.summary, i.external_doc_id
+        FROM instance i
+        JOIN topic t ON t.id = i.topic_id
+        ORDER BY i.id
+    """)
+    return pd.read_sql(q, engine)

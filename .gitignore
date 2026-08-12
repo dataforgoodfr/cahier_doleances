@@ -167,6 +167,14 @@ cython_debug/
 /data
 .DS_Store
 backups/
+analysis_v3.zip
+analysis_v3/
+analysis_v4/
+analyse/data/
+analyse/__pycache__/
+
+# Sauvegardes locales : ne jamais committer
+temp_safe/
 
 # PyCharm
 *.idea
